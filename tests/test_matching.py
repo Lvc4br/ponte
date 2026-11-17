@@ -35,7 +35,7 @@ def test_type_filter_is_case_insensitive():
     assert [record.source_row for record in result] == [1]
 
 
-def test_missing_type_is_preserved_when_filtering():
+def test_missing_type_is_excluded_when_type_filter_is_active():
     rows = [
         BridgeRecord({"tipo_obra": None}, 1),
         BridgeRecord({"tipo_obra": "Ponte"}, 2),
