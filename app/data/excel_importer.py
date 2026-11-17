@@ -9,6 +9,8 @@ HEADER_ALIASES = {
     "vão_m": "vao_m",
     "vao_m": "vao_m",
     "vão": "vao_m",
+    "vão_min_m": "vao_min_m",
+    "vão_max_m": "vao_max_m",
     "largura": "largura_m",
     "comprimento": "compr_obra_m",
 }
