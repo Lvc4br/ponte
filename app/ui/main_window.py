@@ -5,6 +5,8 @@ from PySide6.QtWidgets import (
     QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from app.core.analytics import RATE_FIELDS, summarize_rates
+from app.core.matching import missing_criteria_fields
 from app.core.models import NumericRange, SearchCriteria
 from app.core.validation import format_display_value, parse_input_number
 from app.data.repository import SQLRepository
@@ -15,7 +17,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("ConsultaTaxasPontes")
-        self.resize(1150, 700)
+        self.resize(1250, 780)
         self.repo = SQLRepository()
         self.service = SearchService()
         self.results = []
@@ -29,7 +31,8 @@ class MainWindow(QMainWindow):
         title.setStyleSheet("font-size:22px;font-weight:700;color:#173b57")
         layout.addWidget(title)
         layout.addWidget(QLabel(
-            "Informe o tipo de obra e as dimensões para localizar referências históricas."
+            "Informe os parâmetros para localizar referências históricas. "
+            "O sistema não realiza dimensionamento estrutural."
         ))
 
         bar = QHBoxLayout()
@@ -74,6 +77,16 @@ class MainWindow(QMainWindow):
         buttons.addStretch()
         layout.addLayout(buttons)
 
+        summary_group = QGroupBox("Resumo dos resultados")
+        summary_layout = QVBoxLayout(summary_group)
+        self.match_summary = QLabel("Carregue a base para visualizar o resumo.")
+        self.match_summary.setWordWrap(True)
+        summary_layout.addWidget(self.match_summary)
+        self.rate_summary = QLabel("")
+        self.rate_summary.setWordWrap(True)
+        summary_layout.addWidget(self.rate_summary)
+        layout.addWidget(summary_group)
+
         self.table = QTableWidget()
         self.table.setAlternatingRowColors(True)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -96,7 +109,7 @@ class MainWindow(QMainWindow):
             self.results = records
             self.show_records(records)
             self.status.setText(
-                f"{Path(self.repo.source).name} — {len(records)} obras carregadas"
+                f"{Path(self.repo.source).name} — {len(records)} registros carregados"
             )
         except Exception as exc:
             self.results = []
@@ -136,9 +149,10 @@ class MainWindow(QMainWindow):
             )
             return
         try:
-            self.results = self.service.search(self.repo.records, self.criteria())
-            self.show_records(self.results)
-            self.status.setText(f"{len(self.results)} obra(s) compatível(is)")
+            criteria = self.criteria()
+            self.results = self.service.search(self.repo.records, criteria)
+            self.show_records(self.results, criteria)
+            self.status.setText(f"{len(self.results)} registro(s) retornado(s)")
         except ValueError as exc:
             QMessageBox.warning(self, "Filtros inválidos", str(exc))
 
@@ -149,9 +163,43 @@ class MainWindow(QMainWindow):
             high.clear()
         self.results = self.repo.records
         self.show_records(self.results)
-        self.status.setText(f"{len(self.results)} obras carregadas")
+        self.status.setText(f"{len(self.results)} registros carregados")
 
-    def show_records(self, records):
+    def _show_summary(self, records, criteria=None):
+        if criteria is None:
+            self.match_summary.setText(
+                f"Registros exibidos: {len(records)}. Nenhum filtro de compatibilidade está ativo."
+            )
+        else:
+            uncertain = sum(bool(missing_criteria_fields(r, criteria)) for r in records)
+            confirmed = len(records) - uncertain
+            self.match_summary.setText(
+                f"Registros retornados: {len(records)} | "
+                f"Compatibilidade verificável nos filtros preenchidos: {confirmed} | "
+                f"Dados insuficientes para confirmar todos os filtros: {uncertain}. "
+                "Registros incompletos são mantidos e não devem ser tratados como "
+                "compatibilidade confirmada."
+            )
+
+        summaries = summarize_rates(records)
+        lines = [
+            "Estatísticas por registro (não deduplicadas por obra); "
+            "valores ausentes não são estimados:"
+        ]
+        for field in RATE_FIELDS:
+            item = summaries[field]
+            if item["count"] == 0:
+                lines.append(f"{field}: sem valores numéricos disponíveis")
+            else:
+                lines.append(
+                    f"{field}: n={item['count']} | média={item['mean']:.3f} | "
+                    f"mediana={item['median']:.3f} | "
+                    f"mínimo={item['minimum']:.3f} | máximo={item['maximum']:.3f}"
+                )
+        self.rate_summary.setText("\n".join(lines))
+
+    def show_records(self, records, criteria=None):
+        self._show_summary(records, criteria)
         columns = list(dict.fromkeys(
             key for record in records for key in record.values
         ))
