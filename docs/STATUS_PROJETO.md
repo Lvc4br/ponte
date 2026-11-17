@@ -11,19 +11,23 @@
 - [x] Leitura de dados SQL locais das tabelas obras e analise_oaes.
 - [x] Persistência local da base ativa em SQLite.
 - [x] Filtros por tipo de obra, largura, vão e comprimento.
+- [x] Registros sem dimensões verificáveis não são tratados como correspondências confirmadas quando o filtro correspondente está ativo.
 - [x] Estatísticas descritivas de indicadores disponíveis.
-- [x] Importação aditiva de planilhas Excel .xlsx, com seleção de aba e prévia.
+- [x] Importação aditiva de planilhas Excel .xlsx, com detecção de cabeçalho, seleção de aba e prévia.
+- [x] Validação de cabeçalhos equivalentes duplicados.
 - [x] Exclusão de registros selecionados com confirmação e backup.
 - [x] Preservação de campos originais, valores ausentes e intervalos textuais.
+- [x] Testes locais no Windows: 40 aprovados.
 - [x] Testes automatizados em seis combinações de sistema operacional e versão Python.
+- [x] Validação funcional no Windows pelo usuário: pesquisa, importação Excel e estatísticas.
 
 ## Distribuição
 
 - [x] Release v0.1.0 publicado com pacote Windows x64.
-- [ ] Publicar novo release que inclua importação Excel e gerenciamento de registros.
-- [ ] Validar a versão mais recente no Windows por meio de teste funcional do usuário.
+- [x] Código atualizado e validado na branch main.
+- [ ] Publicar novo release Windows x64 com as funcionalidades e correções mais recentes.
 
-O pacote v0.1.0 é anterior às funcionalidades mais recentes da branch main. Não o apresentar como contendo importação Excel ou exclusão de registros.
+O pacote v0.1.0 é anterior às funcionalidades mais recentes da branch main. Não o apresentar como contendo importação Excel, exclusão de registros ou as correções recentes de pesquisa.
 
 ## Administração de documentos e planilhas: escopo atual
 
@@ -31,11 +35,10 @@ O aplicativo já permite administrar registros tabulares provenientes de SQL e E
 
 ## Próximas etapas
 
-1. Testar importação, consulta, fechamento/reabertura e exclusão no Windows.
-2. Melhorar o mapeamento de cabeçalhos e o relatório de importação.
+1. Gerar e conferir o novo pacote Windows x64 por GitHub Actions.
+2. Continuar aprimorando o mapeamento de cabeçalhos e o relatório de importação.
 3. Implementar cadastro e organização de documentos técnicos vinculados aos registros/planilhas.
 4. Avaliar versionamento, histórico de alterações e permissões.
-5. Gerar novo release após os testes funcionais.
 
 ## Proteção de dados
 
