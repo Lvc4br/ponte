@@ -1,54 +1,61 @@
 # ConsultaTaxasPontes
 
-Aplicativo desktop em Python/PySide6 para consultar taxas históricas de obras de pontes. O sistema organiza referências históricas; não realiza dimensionamento, análise ou validação estrutural.
+Aplicativo desktop Windows para consulta de referências históricas e indicadores de taxas de pontes. Não executa dimensionamento, análise ou validação estrutural.
 
-## Fonte de dados nesta versão
+## Versão
 
-A fonte de dados é um script SQL local: `database/ponte.sql`.
+Primeira versão distribuível planejada: **0.1.0** (prévia funcional). A distribuição será portátil para Windows x64, empacotada com PyInstaller.
 
-1. Copie `database/ponte.sql.example` para `database/ponte.sql`.
-2. Edite o arquivo e inclua os comandos SQL que criam a tabela `obras` e inserem os registros autorizados.
-3. Inicie o aplicativo. O programa executa o script em memória, valida a tabela e reconstrói o banco SQLite local em `data/ponte.db`.
-4. Ao clicar em **Recarregar arquivo SQL**, o banco local é reconstruído novamente a partir do script.
+## Funcionalidades
 
-O arquivo real `database/ponte.sql` e o banco `data/ponte.db` são ignorados pelo Git. Não publique dados corporativos no repositório.
+- Carregamento de script SQL local (database/ponte.sql) para SQLite.
+- Suporte às tabelas obras e analise_oaes.
+- Preservação das colunas e dos valores originais, inclusive campos ausentes e intervalos textuais.
+- Filtros independentes por tipo de obra, largura, vão e comprimento total.
+- Aceita vírgula decimal e ponto decimal nos filtros.
+- Resumo da consulta com quantidade de resultados, registros verificáveis e registros com dados incompletos.
+- Estatísticas por coluna de taxa: quantidade de valores válidos, cobertura, média, mediana, mínimo e máximo.
+- Ordenação da tabela de resultados.
 
-## Estrutura SQL esperada
+## Instalação da versão portátil
 
-A tabela deve se chamar `obras`. O modelo em `database/ponte.sql.example` contém os campos conhecidos, incluindo tipo de obra, largura, intervalo de vão, comprimento e taxas históricas. Os campos cuja definição ainda não foi confirmada são armazenados sem interpretação adicional.
+1. Baixe o ZIP Windows x64 na página Releases.
+2. Extraia a pasta em um local no qual você tenha permissão de gravação.
+3. Na pasta extraída, crie database se ainda não existir.
+4. Copie o SQL autorizado para database/ponte.sql.
+5. Execute ConsultaTaxasPontes.exe.
 
-Para vãos informados como intervalo, use `vao_min_m` e `vao_max_m`. Para cada registro, insira os valores numéricos correspondentes. Campos históricos desconhecidos podem permanecer NULL.
+O release não inclui a base corporativa. O arquivo database/ponte.sql.example é somente um modelo. O banco local será criado em data/ponte.db, ao lado do executável.
 
-## Funcionalidades implementadas nesta etapa
+## Desenvolvimento
 
-- Carregamento de uma base a partir de script SQL local.
-- Criação/reconstrução de banco SQLite local.
-- Filtros por tipo de obra, intervalo de largura, vão e comprimento total.
-- Comparação de intervalos de vãos.
-- Preservação de campos nulos.
-- Exibição dos registros compatíveis em tabela.
+Requisitos: Python 3.11 ou superior. Dependências em requirements.txt.
 
-## Requisitos e instalação
+    python -m venv .venv
+    .\.venv\Scripts\python.exe -m pip install --upgrade pip
+    .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+    .\.venv\Scripts\python.exe -m pytest -v
+    .\.venv\Scripts\python.exe main.py
 
-Python 3.11 ou superior recomendado. Dependências em `requirements.txt`.
+Build local: execute build\build_windows.bat. A saída fica em dist\ConsultaTaxasPontes.
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe main.py
-```
+## Qualidade e publicação
 
-## Testes
+- Testes automatizados em Ubuntu e Windows, Python 3.11, 3.12 e 3.13.
+- Verificação de sintaxe via compileall.
+- Pipeline de release Windows x64: executa testes, empacota com PyInstaller e publica ZIP ao receber tag SemVer vMAJOR.MINOR.PATCH.
+- Não incluir dados reais, credenciais ou arquivos SQL internos em commits, issues, logs ou releases.
 
-```powershell
-.\.venv\Scripts\python.exe -m pytest -v
-```
+## Interpretação dos indicadores
 
-## Executável
+As estatísticas são calculadas por registro, não por obra única. Se a base contiver segmentos da mesma obra, eles podem influenciar as estatísticas mais de uma vez. Valores ausentes e valores textuais não numéricos são ignorados apenas no cálculo do respectivo indicador; a origem não é modificada.
 
-Execute `build\build_windows.bat`. A configuração de empacotamento ainda deverá ser revisada para incluir o script SQL local.
+Os identificadores Paf_kg_m2, Pap_kg_m2 e Af_m2_m2 são exibidos sem interpretação adicional até que suas definições e fórmulas sejam confirmadas na documentação técnica. Não se calculam taxas derivadas sem fórmula validada.
 
-## Limitações
+## Limitações conhecidas
 
-Esta versão ainda precisa ser validada com os dados reais autorizados. Estatísticas de taxas, classificação definitiva de tipos de obra, interpretação de colunas não documentadas e comparação de proximidade serão etapas posteriores. O aplicativo não estima valores ausentes nem altera os registros de origem.
+- A classificação de completude informa se os campos usados nos filtros estão disponíveis; não representa aprovação de engenharia.
+- A comparação de tipos de obra depende do texto existente na fonte.
+- Não há deduplicação automática de obras/segmentos.
+- Não há validação independente da procedência ou qualidade técnica dos dados.
+- O aplicativo é uma ferramenta de consulta e apoio à organização de referências, não substitui análise ou responsabilidade de profissional habilitado.
