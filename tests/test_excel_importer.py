@@ -91,3 +91,26 @@ def test_imported_excel_records_can_be_filtered_by_dimensions(tmp_path):
     )
     assert len(result) == 1
     assert result[0].get("largura_m") == 12.5
+
+
+def test_excel_import_skips_title_rows_and_maps_rate_headers(tmp_path):
+    path = tmp_path / "com_titulo.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["LEVANTAMENTO HISTÓRICO DE OBRAS"])
+    sheet.append([None])
+    sheet.append([
+        "Obra", "Data", "Largura (m)", "Vão (m)", "Seção",
+        "Compr. obra (m)", "em_m3_m2", "Paf_kg_m2", "Pap_kg_m2", "Af_m2_m2"
+    ])
+    sheet.append([1, "2020", 12.5, "41,25 - 41,80", "I", 120, "0,42", 90, 30, 1.8])
+    sheet.append([2, "2021", 10, "20", "T", 25, "0,30", 60, 20, 1.2])
+    workbook.save(path)
+
+    records = read_excel(path)
+    assert len(records) == 2
+    assert records[0].get("compr_obra_m") == 120
+    assert records[1].get("compr_obra_m") == 25
+    assert records[0].get("em_m3_m2") == "0,42"
+    assert records[0].get("Paf_kg_m2") == 90
+    assert records[0].source_row == 4
