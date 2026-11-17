@@ -21,9 +21,9 @@ def test_overlap_range():
     assert result[0].source_row == 1
 
 
-def test_missing_value_kept():
+def test_missing_value_is_not_a_confirmed_match():
     row = BridgeRecord({"largura_m": None}, 1)
-    assert filter_records([row], SearchCriteria(width=NumericRange(5, 10))) == [row]
+    assert filter_records([row], SearchCriteria(width=NumericRange(5, 10))) == []
 
 
 def test_type_filter_is_case_insensitive():
@@ -41,7 +41,7 @@ def test_missing_type_is_excluded_when_type_filter_is_active():
         BridgeRecord({"tipo_obra": "Ponte"}, 2),
     ]
     result = filter_records(rows, SearchCriteria(type_obra="Ponte"))
-    assert [record.source_row for record in result] == [1, 2]
+    assert [record.source_row for record in result] == [2]
 
 def test_search_by_total_length_only():
     rows = [
@@ -80,7 +80,7 @@ def test_search_by_total_length_minimum_only():
         rows,
         SearchCriteria(total_length=NumericRange(80, float("inf"))),
     )
-    assert [record.source_row for record in result] == [2, 3, 4]
+    assert [record.source_row for record in result] == [2, 3]
 
 
 def test_search_by_total_length_maximum_only():
@@ -94,7 +94,7 @@ def test_search_by_total_length_maximum_only():
         rows,
         SearchCriteria(total_length=NumericRange(float("-inf"), 80)),
     )
-    assert [record.source_row for record in result] == [1, 2, 4]
+    assert [record.source_row for record in result] == [1, 2]
 
 
 from app.core.matching import missing_criteria_fields
