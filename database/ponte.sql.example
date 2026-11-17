@@ -1,0 +1,33 @@
+-- Modelo temporário da base de dados ConsultaTaxasPontes.
+-- Copie este arquivo para database/ponte.sql e insira os registros autorizados.
+-- Não coloque dados corporativos neste repositório público.
+-- O aplicativo reconstrói data/ponte.db a partir deste script ao iniciar.
+
+CREATE TABLE obras (
+    id INTEGER PRIMARY KEY,
+    obra INTEGER NOT NULL,
+    tipo_obra TEXT,
+    largura_m REAL,
+    vao_min_m REAL,
+    vao_max_m REAL,
+    secao TEXT,
+    hviga_laje_m TEXT,
+    compr_obra_m REAL,
+    em_m3_m2 REAL,
+    Paf_kg_m2 REAL,
+    Pap_kg_m2 REAL,
+    Af_m2_m2 REAL,
+    anc_at_pas REAL
+);
+
+CREATE INDEX idx_obras_tipo ON obras(tipo_obra);
+CREATE INDEX idx_obras_largura ON obras(largura_m);
+
+-- Exemplo de cadastro (valores fictícios; substitua pelos dados reais):
+-- INSERT INTO obras (
+--   obra, tipo_obra, largura_m, vao_min_m, vao_max_m, secao,
+--   hviga_laje_m, compr_obra_m, em_m3_m2, Paf_kg_m2, Pap_kg_m2
+-- ) VALUES (
+--   1, 'Ponte', 12.0, 41.25, 41.80, 'I',
+--   '1,60+0,20', 100.0, 0.45, 85.0, 35.0
+-- );
