@@ -1,36 +1,28 @@
-# Instalação no Windows
+# Instalação Windows
 
-## Preparar o ambiente
+## Versão portátil
 
-No PowerShell, na pasta do projeto:
+1. Baixe o ZIP Windows x64 na página Releases e extraia-o em uma pasta com permissão de gravação.
+2. Copie o SQL autorizado para database\ponte.sql.
+3. Execute ConsultaTaxasPontes.exe.
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
+O SQL real não é incluído no release. O modelo database\ponte.sql.example não contém a base corporativa. O aplicativo cria data\ponte.db na pasta da distribuição.
 
-## Preparar a base SQL
+## Executar pelo código-fonte
 
-```powershell
-Copy-Item .\database\ponte.sql.example .\database\ponte.sql
-notepad .\database\ponte.sql
-```
+    python -m venv .venv
+    .\.venv\Scripts\python.exe -m pip install --upgrade pip
+    .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+    .\.venv\Scripts\python.exe -m pytest -v
+    .\.venv\Scripts\python.exe main.py
 
-Edite o arquivo com os comandos SQL e os dados autorizados. Não publique `database/ponte.sql`.
+## Gerar executável local
 
-## Executar
+Execute build\build_windows.bat. O diretório final será dist\ConsultaTaxasPontes.
 
-```powershell
-.\.venv\Scripts\python.exe main.py
-```
+## Cuidados
 
-O aplicativo reconstrói `data/ponte.db` ao iniciar e ao usar o botão **Recarregar arquivo SQL**.
-
-## Testes
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest -v
-```
-
-A geração do executável ainda requer configuração adicional para empacotar o script SQL local.
+- Não coloque o SQL real, SQLite com dados reais ou planilhas internas no GitHub.
+- Mantenha a pasta extraída em local com permissão de gravação; o programa cria data\ponte.db ao lado do executável.
+- Faça backup do arquivo SQL original antes de editar.
+- O executável ainda não possui assinatura digital de código; o Windows pode exibir um aviso de segurança.
