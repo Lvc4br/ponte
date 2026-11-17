@@ -96,3 +96,40 @@ def test_search_by_total_length_maximum_only():
     )
     assert [record.source_row for record in result] == [1, 2, 4]
 
+
+from app.core.matching import missing_criteria_fields
+
+
+def test_missing_criteria_fields_identifies_unknown_dimensions():
+    row = BridgeRecord({"largura_m": 12, "compr_obra_m": None}, 1)
+    criteria = SearchCriteria(
+        width=NumericRange(10, 14),
+        total_length=NumericRange(80, 120),
+    )
+    assert missing_criteria_fields(row, criteria) == ["compr_obra_m"]
+
+
+def test_missing_criteria_fields_identifies_missing_type_and_span():
+    row = BridgeRecord({"tipo_obra": None, "largura_m": 12}, 1)
+    criteria = SearchCriteria(
+        type_obra="Ponte",
+        span=NumericRange(30, 40),
+    )
+    assert missing_criteria_fields(row, criteria) == ["tipo_obra", "vao_m"]
+
+
+def test_complete_record_has_no_uncertain_filters():
+    row = BridgeRecord({
+        "tipo_obra": "Ponte",
+        "largura_m": "12,0",
+        "vao_min_m": 30,
+        "vao_max_m": 40,
+        "compr_obra_m": 100,
+    }, 1)
+    criteria = SearchCriteria(
+        type_obra="Ponte",
+        width=NumericRange(10, 14),
+        span=NumericRange(32, 38),
+        total_length=NumericRange(90, 110),
+    )
+    assert missing_criteria_fields(row, criteria) == []
