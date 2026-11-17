@@ -1,11 +1,23 @@
 # Histórico de alterações
 
-## [0.1.0] - Em preparação
+## Não publicado — branch main
 
-- Aplicativo desktop de consulta de referências e taxas de pontes.
-- Importação de dados por script SQL local, com persistência SQLite.
-- Filtros independentes de tipo de obra, largura, vão e comprimento.
-- Resumo de qualidade da consulta e estatísticas descritivas por coluna.
-- Build portátil Windows x64 automatizado por GitHub Actions.
-- Dados corporativos excluídos do pacote e do repositório.
-- Versão inicial de avaliação; não realiza dimensionamento estrutural.
+### Adicionado
+- Importação aditiva de registros de planilhas Excel no formato .xlsx.
+- Seleção de aba e prévia antes da confirmação da importação.
+- Persistência local independente da fonte SQL.
+- Exclusão de registros selecionados com confirmação e backup.
+- Testes automatizados para leitura Excel e persistência dos registros.
+- Documentação do escopo atual, limitações e situação da distribuição.
+
+### Observações
+- Estas alterações estão na branch main e ainda não fazem parte do ZIP publicado em v0.1.0.
+- Um novo release deverá ser gerado após validação funcional da versão atualizada no Windows.
+
+## [0.1.0] — publicado
+
+- Primeira distribuição portátil Windows x64.
+- Aplicativo desktop de consulta de taxas e referências de pontes.
+- Leitura de dados por script SQL local.
+- Filtros dimensionais e estatísticas descritivas.
+- Build automatizado por GitHub Actions.
