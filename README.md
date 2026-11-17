@@ -1,6 +1,6 @@
-# ConsultaTaxasPontes
+# Consulta de Taxas de Pontes
 
-Aplicativo desktop Windows para consulta de referências históricas e indicadores de taxas de pontes. Não executa dimensionamento, análise ou validação estrutural.
+Aplicativo desktop Windows para consulta de referências e indicadores de taxas de pontes. Não executa dimensionamento, análise ou validação estrutural.
 
 ## Versão
 
@@ -37,7 +37,7 @@ Requisitos: Python 3.11 ou superior. Dependências em requirements.txt.
     .\.venv\Scripts\python.exe -m pytest -v
     .\.venv\Scripts\python.exe main.py
 
-Build local: execute build\build_windows.bat. A saída fica em dist\ConsultaTaxasPontes.
+Build local: execute build\build_windows.bat. A saída fica em dist\ConsultaTaxasPontes. O executável é ConsultaTaxasPontes.exe.
 
 ## Qualidade e publicação
 
