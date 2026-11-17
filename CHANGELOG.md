@@ -1,6 +1,6 @@
 # Histórico de alterações
 
-## [0.1.0] - Primeira versão distribuível
+## [0.1.0] - Em preparação
 
 - Aplicativo desktop de consulta de referências históricas de pontes.
 - Importação de dados por script SQL local, com persistência SQLite.
