@@ -1,14 +1,21 @@
 from pathlib import Path
 import sqlite3
+import sys
 
 from app.core.models import BridgeRecord
 
 
-DEFAULT_SQL = Path(__file__).resolve().parents[2] / "database" / "ponte.sql"
-DEFAULT_DB = Path(__file__).resolve().parents[2] / "data" / "ponte.db"
+def application_directory():
+    """Return the project directory or the folder containing the frozen executable."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[2]
 
-# The user's source spreadsheet/SQL uses Portuguese labels with accents.
-# Keep every original column and add canonical aliases used by the application.
+
+APP_DIR = application_directory()
+DEFAULT_SQL = APP_DIR / "database" / "ponte.sql"
+DEFAULT_DB = APP_DIR / "data" / "ponte.db"
+
 COLUMN_ALIASES = {
     "vão_m": "vao_m",
     "vão_min_m": "vao_min_m",
@@ -42,7 +49,8 @@ def load_sql_database(sql_path=DEFAULT_SQL, db_path=DEFAULT_DB):
     if not sql_path.is_file():
         raise FileNotFoundError(
             f"Arquivo SQL não encontrado: {sql_path}\n"
-            "Copie database/ponte.sql.example para database/ponte.sql e insira os dados."
+            "Coloque database/ponte.sql ao lado do aplicativo. "
+            "Use database/ponte.sql.example como modelo."
         )
     script = sql_path.read_text(encoding="utf-8-sig")
     if not script.strip():
@@ -69,8 +77,6 @@ def load_sql_database(sql_path=DEFAULT_SQL, db_path=DEFAULT_DB):
             label for label, alternatives in required_groups.items()
             if not (folded & {name.casefold() for name in alternatives})
         ]
-        # Vão is allowed to be absent in legacy/partial records; all other
-        # dimensions are required as columns, not as non-NULL values.
         missing = [label for label in missing if label != "vão"]
         if missing:
             raise ValueError(
