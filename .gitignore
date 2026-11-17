@@ -9,5 +9,9 @@ dist/
 .env
 .vscode/
 .idea/
+
+# Bases e bancos locais: não publicar dados corporativos
+/database/ponte.sql
+/data/*.db
 *.xlsx
 *.xls
