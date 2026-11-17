@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.core.models import NumericRange, SearchCriteria
-from app.core.validation import parse_number
+from app.core.validation import parse_input_number
 from app.data.repository import SQLRepository
 from app.services.search_service import SearchService
 
@@ -106,11 +106,18 @@ class MainWindow(QMainWindow):
 
     def criteria(self):
         data = {}
+        labels = {
+            "width": "Largura",
+            "span": "Vão",
+            "total_length": "Comprimento total",
+        }
         for key, (low, high) in self.fields.items():
-            minimum = parse_number(low.text()) if low.text().strip() else None
-            maximum = parse_number(high.text()) if high.text().strip() else None
+            minimum = parse_input_number(low.text(), f"{labels[key]} (mínimo)")
+            maximum = parse_input_number(high.text(), f"{labels[key]} (máximo)")
             if minimum is not None and maximum is not None and minimum > maximum:
-                raise ValueError("O mínimo não pode ser maior que o máximo.")
+                raise ValueError(
+                    f"{labels[key]}: o valor mínimo não pode ser maior que o máximo."
+                )
             data[key] = (
                 NumericRange(
                     minimum if minimum is not None else float("-inf"),
