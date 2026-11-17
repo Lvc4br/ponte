@@ -54,7 +54,7 @@ def match_record(record: BridgeRecord, criteria: SearchCriteria) -> bool:
             continue
         stored = parse_range(record.get(column))
         # Keep incomplete historical records, but identify them in the UI.
-        if stored is not None and not stored.overlaps(wanted):
+        if stored is None or not stored.overlaps(wanted):
             return False
 
     if criteria.span is not None:
