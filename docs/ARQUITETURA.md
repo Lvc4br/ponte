@@ -1,9 +1,13 @@
 # Arquitetura
 
-- app/core: modelos, validação e correspondência de intervalos.
-- app/data: leitura e mapeamento de colunas Excel.
-- app/services: pesquisa e exportação.
-- app/ui: interface desktop PySide6.
-- tests: testes automatizados.
+- `database/ponte.sql.example`: modelo versionado do script SQL.
+- `database/ponte.sql`: script local com os dados temporários; ignorado pelo Git.
+- `data/ponte.db`: banco SQLite reconstruído a partir do script SQL; ignorado pelo Git.
+- `app/core`: modelos, validação e correspondência de intervalos.
+- `app/data/sql_loader.py`: execução controlada do script e reconstrução do SQLite.
+- `app/data/repository.py`: acesso aos registros carregados.
+- `app/services`: serviços de pesquisa.
+- `app/ui`: interface desktop PySide6.
+- `tests`: testes automatizados.
 
-A planilha padrão é a aba Base_limpa, com cabeçalho na segunda linha (índice 1). Os valores originais são preservados. Vãos textuais como 41,25 - 41,80 são comparados por sobreposição. Campos ausentes não eliminam automaticamente registros. O aplicativo consulta referências históricas; não dimensiona estruturas.
+O script deve criar a tabela `obras`. A interface filtra tipo de obra, largura, vão e comprimento total. Para vãos, use `vao_min_m` e `vao_max_m`. Campos ausentes são preservados e não são tratados como zero. O aplicativo consulta referências históricas; não dimensiona estruturas.
