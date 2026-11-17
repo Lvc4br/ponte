@@ -42,3 +42,57 @@ def test_missing_type_is_preserved_when_filtering():
     ]
     result = filter_records(rows, SearchCriteria(type_obra="Ponte"))
     assert [record.source_row for record in result] == [1, 2]
+
+def test_search_by_total_length_only():
+    rows = [
+        BridgeRecord(
+            {"largura_m": 10, "vao_m": 20, "compr_obra_m": 100},
+            1,
+        ),
+        BridgeRecord(
+            {"largura_m": 30, "vao_m": 50, "compr_obra_m": 150},
+            2,
+        ),
+        BridgeRecord(
+            {"largura_m": None, "vao_m": None, "compr_obra_m": 120},
+            3,
+        ),
+        BridgeRecord(
+            {"largura_m": 10, "vao_m": 20, "compr_obra_m": 200},
+            4,
+        ),
+    ]
+    result = filter_records(
+        rows,
+        SearchCriteria(total_length=NumericRange(90, 160)),
+    )
+    assert [record.source_row for record in result] == [1, 2, 3]
+
+
+def test_search_by_total_length_minimum_only():
+    rows = [
+        BridgeRecord({"compr_obra_m": 79}, 1),
+        BridgeRecord({"compr_obra_m": 80}, 2),
+        BridgeRecord({"compr_obra_m": 120}, 3),
+        BridgeRecord({"compr_obra_m": None}, 4),
+    ]
+    result = filter_records(
+        rows,
+        SearchCriteria(total_length=NumericRange(80, float("inf"))),
+    )
+    assert [record.source_row for record in result] == [2, 3, 4]
+
+
+def test_search_by_total_length_maximum_only():
+    rows = [
+        BridgeRecord({"compr_obra_m": 79}, 1),
+        BridgeRecord({"compr_obra_m": 80}, 2),
+        BridgeRecord({"compr_obra_m": 120}, 3),
+        BridgeRecord({"compr_obra_m": None}, 4),
+    ]
+    result = filter_records(
+        rows,
+        SearchCriteria(total_length=NumericRange(float("-inf"), 80)),
+    )
+    assert [record.source_row for record in result] == [1, 2, 4]
+
