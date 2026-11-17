@@ -13,6 +13,8 @@ dist/
 # Bases e bancos locais: não publicar dados corporativos
 /database/ponte.sql
 /data/*.db
+/data/*.sqlite3
+/data/*.backup
 *.xlsx
 *.xls
 
