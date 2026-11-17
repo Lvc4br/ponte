@@ -43,7 +43,7 @@ Build local: execute build\build_windows.bat. A saída fica em dist\ConsultaTaxa
 
 - Testes automatizados em Ubuntu e Windows, Python 3.11, 3.12 e 3.13.
 - Verificação de sintaxe via compileall.
-- Pipeline de release Windows x64: executa testes, empacota com PyInstaller e publica ZIP ao receber tag SemVer vMAJOR.MINOR.PATCH.
+- Pipeline de release Windows x64: executa testes, empacota com PyInstaller e publica ZIP ao receber tag SemVer vMAJOR.MINOR.PATCH ou execução manual do workflow com uma versão informada.
 - Não incluir dados reais, credenciais ou arquivos SQL internos em commits, issues, logs ou releases.
 
 ## Interpretação dos indicadores
