@@ -27,6 +27,17 @@ Primeira versão distribuível planejada: **0.1.0** (prévia funcional). A distr
 
 O release não inclui a base corporativa. O arquivo database/ponte.sql.example é somente um modelo. O banco local será criado em data/ponte.db, ao lado do executável.
 
+## Gerenciar registros e importar Excel
+
+A base de consulta ativa é mantida localmente em `data/registros.sqlite3`, separada do arquivo SQL original. Na primeira inicialização com SQL válido, os registros SQL são copiados para essa base local. A partir daí, as alterações feitas no aplicativo permanecem salvas entre execuções.
+
+- **Adicionar registros do Excel:** selecione um arquivo `.xlsx`, escolha a aba, confira a prévia e confirme. Os novos registros são anexados; os existentes não são substituídos.
+- **Excluir selecionados:** selecione uma ou mais linhas e confirme a exclusão. Um backup da base local é criado antes da operação.
+- **Preservação:** não há deduplicação automática; linhas incompletas e intervalos textuais são mantidos. A planilha original não é modificada.
+- **Limite atual:** importação de arquivos `.xlsx`; arquivos antigos `.xls` ainda não são aceitos.
+
+O SQL de origem continua intacto. A base ativa passa a ser a cópia local gerenciada pelo aplicativo; alterações posteriores feitas diretamente no SQL não são mescladas automaticamente. Faça cópia de segurança de `data/registros.sqlite3` antes de mover ou reinstalar o aplicativo.
+
 ## Desenvolvimento
 
 Requisitos: Python 3.11 ou superior. Dependências em requirements.txt.
