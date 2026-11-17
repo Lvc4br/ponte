@@ -2,15 +2,16 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
-    QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
-    QWidget, QHeaderView,
+    QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
+    QInputDialog, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from app.core.analytics import RATE_FIELDS, summarize_rates
 from app.core.matching import missing_criteria_fields
 from app.core.models import NumericRange, SearchCriteria
 from app.core.validation import format_display_value, parse_input_number
+from app.data.excel_importer import read_excel
 from app.data.repository import SQLRepository
 from app.services.search_service import SearchService
 
@@ -47,14 +48,20 @@ class MainWindow(QMainWindow):
         title.setStyleSheet("font-size:22px;font-weight:700;color:#173b57")
         layout.addWidget(title)
         layout.addWidget(QLabel(
-            "Referências históricas para consulta. O sistema não realiza "
-            "dimensionamento nem validação estrutural."
+            "Referências para consulta. O sistema não realiza dimensionamento "
+            "nem validação estrutural."
         ))
 
         bar = QHBoxLayout()
         reload_button = QPushButton("Recarregar arquivo SQL")
         reload_button.clicked.connect(self.load_sql)
         bar.addWidget(reload_button)
+        import_button = QPushButton("Adicionar registros do Excel")
+        import_button.clicked.connect(self.import_excel)
+        bar.addWidget(import_button)
+        delete_button = QPushButton("Excluir selecionados")
+        delete_button.clicked.connect(self.delete_selected)
+        bar.addWidget(delete_button)
         self.status = QLabel("Carregando base SQL...")
         bar.addWidget(self.status, 1)
         layout.addLayout(bar)
@@ -96,10 +103,11 @@ class MainWindow(QMainWindow):
         summary_group = QGroupBox("Resumo da consulta")
         summary_layout = QVBoxLayout(summary_group)
         self.summary_headline = QLabel("Carregue a base para consultar.")
-        self.summary_headline.setStyleSheet("font-size:15px;font-weight:700;color:#173b57")
+        self.summary_headline.setStyleSheet(
+            "font-size:15px;font-weight:700;color:#173b57"
+        )
         self.summary_headline.setWordWrap(True)
         summary_layout.addWidget(self.summary_headline)
-
         self.summary_detail = QLabel("")
         self.summary_detail.setWordWrap(True)
         summary_layout.addWidget(self.summary_detail)
@@ -121,8 +129,8 @@ class MainWindow(QMainWindow):
         note = QLabel(
             "Estatísticas calculadas por registro, não por obra única. "
             "Valores ausentes e textos não numéricos são excluídos apenas do "
-            "cálculo daquele indicador. Os nomes das colunas foram preservados; "
-            "a interpretação técnica de Paf, Pap e Af depende da documentação da fonte."
+            "cálculo daquele indicador. A interpretação técnica de Paf, Pap e Af "
+            "depende da documentação da fonte."
         )
         note.setWordWrap(True)
         note.setStyleSheet("color:#596579;font-size:11px")
@@ -133,6 +141,7 @@ class MainWindow(QMainWindow):
         self.table.setAlternatingRowColors(True)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
         self.table.setSortingEnabled(True)
         self.table.verticalHeader().setVisible(False)
         layout.addWidget(self.table, 1)
@@ -154,13 +163,116 @@ class MainWindow(QMainWindow):
             self.results = records
             self.show_records(records)
             self.status.setText(
-                f"{Path(self.repo.source).name} — {len(records)} registros carregados"
+                f"{Path(self.repo.source).name} — {len(records)} registros ativos"
             )
         except Exception as exc:
-            self.results = []
-            self.show_records([])
+            self.results = self.repo.records
+            self.show_records(self.results)
             self.status.setText("Base SQL não carregada")
-            QMessageBox.warning(self, "Não foi possível carregar a base SQL", str(exc))
+            QMessageBox.warning(
+                self, "Não foi possível carregar a base SQL", str(exc)
+            )
+
+    def import_excel(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Selecionar planilha Excel", "",
+            "Planilhas Excel (*.xlsx)"
+        )
+        if not path:
+            return
+        try:
+            from openpyxl import load_workbook
+            workbook = load_workbook(path, read_only=True, data_only=False)
+            try:
+                sheets = workbook.sheetnames
+            finally:
+                workbook.close()
+            sheet, accepted = QInputDialog.getItem(
+                self, "Selecionar aba", "Aba para importar:", sheets, 0, False
+            )
+            if not accepted:
+                return
+            incoming = read_excel(path, sheet)
+            sample = incoming[:5]
+            preview = "\n".join(
+                " • " + ", ".join(
+                    f"{key}: {format_display_value(value)}"
+                    for key, value in record.values.items()
+                )
+                for record in sample
+            )
+            more = (
+                f"\n... e mais {len(incoming) - len(sample)} registro(s)"
+                if len(incoming) > len(sample) else ""
+            )
+            answer = QMessageBox.question(
+                self, "Confirmar inclusão",
+                f"Arquivo: {Path(path).name}\nAba: {sheet}\n"
+                f"Novos registros: {len(incoming)}\n\n"
+                f"Prévia das primeiras linhas:\n{preview}{more}\n\n"
+                "Os registros serão ADICIONADOS à base atual. "
+                "Nenhum registro existente será substituído ou deduplicado.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            count = self.repo.add_records(incoming)
+            self.results = self.repo.records
+            self.show_records(self.results)
+            self.status.setText(
+                f"{count} registro(s) adicionados — {len(self.repo.records)} ativos"
+            )
+            QMessageBox.information(
+                self, "Importação concluída",
+                f"{count} registro(s) adicionados com sucesso. "
+                "A base foi salva localmente e continuará disponível ao reabrir o aplicativo."
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "Falha na importação", str(exc))
+
+    def delete_selected(self):
+        selected_rows = sorted({
+            index.row() for index in self.table.selectionModel().selectedRows()
+        })
+        if not selected_rows:
+            QMessageBox.information(
+                self, "Nenhum registro selecionado",
+                "Selecione uma ou mais linhas na tabela antes de excluir."
+            )
+            return
+        ids = []
+        for row in selected_rows:
+            item = self.table.item(row, 0)
+            if item is not None:
+                record_id = item.data(Qt.ItemDataRole.UserRole)
+                if record_id is not None:
+                    ids.append(record_id)
+        if not ids:
+            QMessageBox.warning(
+                self, "Não foi possível excluir",
+                "Não foi possível identificar os registros selecionados."
+            )
+            return
+        answer = QMessageBox.question(
+            self, "Confirmar exclusão",
+            f"Excluir permanentemente {len(ids)} registro(s) selecionado(s) "
+            "da base local? A fonte SQL original não será alterada.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.repo.store.backup()
+            deleted = self.repo.delete_records(ids)
+            self.results = self.repo.records
+            self.show_records(self.results)
+            self.status.setText(
+                f"{deleted} registro(s) excluídos — {len(self.repo.records)} ativos"
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Erro ao excluir registros", str(exc))
 
     def criteria(self):
         data = {}
@@ -221,20 +333,21 @@ class MainWindow(QMainWindow):
                 "Nenhum filtro ativo. As estatísticas abaixo consideram todos os registros."
             )
         else:
-            uncertain = sum(bool(missing_criteria_fields(r, criteria)) for r in records)
+            uncertain = sum(
+                bool(missing_criteria_fields(record, criteria))
+                for record in records
+            )
             verified = result_count - uncertain
             rejected = max(0, source_count - result_count)
             self.summary_headline.setText(
                 f"{result_count} registros retornados de {source_count} registros da base."
             )
             self.summary_detail.setText(
-                f"Compatibilidade verificável nos filtros preenchidos: {verified}  |  "
-                f"Dados insuficientes para confirmar todos os filtros: {uncertain}  |  "
-                f"Não retornados por divergência nos dados disponíveis: {rejected}.\n"
-                "Os registros com dados incompletos permanecem na lista para não "
-                "descartar referências históricas; confira-os antes de comparar."
+                f"Compatibilidade verificável: {verified}  |  "
+                f"Dados insuficientes: {uncertain}  |  "
+                f"Não retornados por divergência: {rejected}.\n"
+                "Registros incompletos permanecem disponíveis para conferência."
             )
-
         summaries = summarize_rates(records)
         self.rate_table.setSortingEnabled(False)
         self.rate_table.setRowCount(len(RATE_FIELDS))
@@ -243,13 +356,10 @@ class MainWindow(QMainWindow):
             count = item["count"]
             coverage = (100 * count / result_count) if result_count else 0
             values = [
-                RATE_LABELS.get(field, field),
-                str(count),
+                RATE_LABELS.get(field, field), str(count),
                 f"{coverage:.1f}%".replace(".", ","),
-                _pt_number(item["mean"]),
-                _pt_number(item["median"]),
-                _pt_number(item["minimum"]),
-                _pt_number(item["maximum"]),
+                _pt_number(item["mean"]), _pt_number(item["median"]),
+                _pt_number(item["minimum"]), _pt_number(item["maximum"]),
             ]
             for column, value in enumerate(values):
                 cell = QTableWidgetItem(value)
@@ -271,9 +381,9 @@ class MainWindow(QMainWindow):
         for row_index, record in enumerate(records):
             for column_index, key in enumerate(columns):
                 value = format_display_value(record.get(key))
-                self.table.setItem(
-                    row_index, column_index,
-                    QTableWidgetItem(value),
-                )
+                cell = QTableWidgetItem(value)
+                if column_index == 0:
+                    cell.setData(Qt.ItemDataRole.UserRole, record.source_row)
+                self.table.setItem(row_index, column_index, cell)
         self.table.resizeColumnsToContents()
         self.table.setSortingEnabled(True)
