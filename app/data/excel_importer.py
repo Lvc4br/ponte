@@ -6,9 +6,9 @@ from app.core.models import BridgeRecord
 
 
 HEADER_ALIASES = {
-    "vão_m": "vão_m",
-    "vao_m": "vão_m",
-    "vão": "vão_m",
+    "vão_m": "vao_m",
+    "vao_m": "vao_m",
+    "vão": "vao_m",
     "largura": "largura_m",
     "comprimento": "compr_obra_m",
 }
@@ -48,7 +48,9 @@ def read_excel(path, sheet_name=None):
             for index, header in enumerate(headers):
                 value = row[index] if index < len(row) else None
                 canonical = HEADER_ALIASES.get(header.casefold(), header)
-                values[canonical] = value
+                values[header] = value
+                if canonical != header:
+                    values[canonical] = value
             records.append(BridgeRecord(values, row_number))
         if not records:
             raise ValueError("A aba não contém registros abaixo do cabeçalho.")
