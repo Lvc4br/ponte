@@ -1,13 +1,33 @@
 # Arquitetura
 
-- `database/ponte.sql.example`: modelo versionado do script SQL.
-- `database/ponte.sql`: script local com os dados temporários; ignorado pelo Git.
-- `data/ponte.db`: banco SQLite reconstruído a partir do script SQL; ignorado pelo Git.
-- `app/core`: modelos, validação e correspondência de intervalos.
-- `app/data/sql_loader.py`: execução controlada do script e reconstrução do SQLite.
-- `app/data/repository.py`: acesso à base ativa e operações de inclusão/exclusão.\n- `app/data/dataset_store.py`: persistência local dos registros e backups, independente do SQL original.\n- `app/data/excel_importer.py`: leitura de planilhas `.xlsx`, preservando cabeçalhos e valores de origem.
-- `app/services`: serviços de pesquisa.
-- `app/ui`: interface desktop PySide6.
-- `tests`: testes automatizados.
+## Componentes
 
-O script deve criar a tabela `obras`. A interface filtra tipo de obra, largura, vão e comprimento total. Para vãos, use `vao_min_m` e `vao_max_m`. Campos ausentes são preservados e não são tratados como zero. O SQL inicial é copiado para `data/registros.sqlite3` somente quando a base gerenciada ainda está vazia. Inclusões do Excel e exclusões são persistidas nesse arquivo separado; o SQL original não é alterado. O aplicativo consulta referências; não dimensiona estruturas.
+- database/ponte.sql.example: modelo de script SQL, sem dados corporativos.
+- database/ponte.sql: fonte SQL local, ignorada pelo Git.
+- data/ponte.db: cópia SQLite intermediária produzida ao executar a fonte SQL.
+- data/registros.sqlite3: base local gerenciada pelo aplicativo, com inclusões e exclusões persistentes.
+- app/core: modelos, validação, correspondência de intervalos e estatísticas.
+- app/data/sql_loader.py: valida e executa o SQL local, produzindo registros e a cópia SQLite intermediária.
+- app/data/excel_importer.py: lê planilhas .xlsx, preservando os cabeçalhos e valores encontrados.
+- app/data/dataset_store.py: armazena registros em SQLite local e cria backup.
+- app/data/repository.py: coordena a carga inicial, inclusão e exclusão na base ativa.
+- app/services: serviços de pesquisa.
+- app/ui: interface desktop PySide6.
+- tests: testes automatizados.
+
+## Fluxo de dados
+
+1. Na primeira inicialização, o aplicativo valida e executa o SQL local.
+2. Se a base gerenciada ainda estiver vazia, copia os registros SQL para data/registros.sqlite3.
+3. A pesquisa, a importação Excel e a exclusão trabalham sobre a base gerenciada.
+4. A importação Excel adiciona registros; não substitui a base e não deduplica automaticamente.
+5. A exclusão cria backup antes de remover os IDs selecionados.
+6. A fonte SQL permanece intacta.
+
+Alterações posteriores no SQL não são mescladas automaticamente com uma base gerenciada já preenchida. O usuário deve preservar backups antes de qualquer intervenção manual.
+
+## Limites
+
+A camada Excel atual aceita apenas .xlsx e não possui mapeamento manual de colunas. O sistema ainda não armazena arquivos PDF/Word ou anexos, nem oferece versionamento documental, aprovação, permissões por usuário ou trilha de auditoria.
+
+O aplicativo organiza e consulta registros técnicos; não executa dimensionamento ou validação estrutural.
