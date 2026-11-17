@@ -43,9 +43,10 @@ def missing_criteria_fields(record: BridgeRecord, criteria: SearchCriteria):
 def match_record(record: BridgeRecord, criteria: SearchCriteria) -> bool:
     if criteria.type_obra:
         stored_type = record.get("tipo_obra")
-        if stored_type is not None and str(stored_type).strip():
-            if str(stored_type).strip().casefold() != criteria.type_obra.strip().casefold():
-                return False
+        if stored_type is None or not str(stored_type).strip():
+            return False
+        if str(stored_type).strip().casefold() != criteria.type_obra.strip().casefold():
+            return False
 
     for attr, column in FIELDS.items():
         wanted = getattr(criteria, attr)
@@ -58,7 +59,7 @@ def match_record(record: BridgeRecord, criteria: SearchCriteria) -> bool:
 
     if criteria.span is not None:
         stored = _stored_span(record, criteria.span)
-        if stored is not None and not stored.overlaps(criteria.span):
+        if stored is None or not stored.overlaps(criteria.span):
             return False
 
     return True
