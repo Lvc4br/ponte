@@ -32,7 +32,7 @@ def _pt_number(value):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ConsultaTaxasPontes")
+        self.setWindowTitle("Consulta de Taxas de Pontes")
         self.resize(1320, 850)
         self.repo = SQLRepository()
         self.service = SearchService()
@@ -43,7 +43,7 @@ class MainWindow(QMainWindow):
     def _build(self):
         root = QWidget()
         layout = QVBoxLayout(root)
-        title = QLabel("Consulta de taxas históricas de pontes")
+        title = QLabel("Consulta de taxas de pontes")
         title.setStyleSheet("font-size:22px;font-weight:700;color:#173b57")
         layout.addWidget(title)
         layout.addWidget(QLabel(
@@ -215,7 +215,7 @@ class MainWindow(QMainWindow):
         result_count = len(records)
         if criteria is None:
             self.summary_headline.setText(
-                f"Base carregada: {source_count} registros históricos."
+                f"Base carregada: {source_count} registros."
             )
             self.summary_detail.setText(
                 "Nenhum filtro ativo. As estatísticas abaixo consideram todos os registros."
