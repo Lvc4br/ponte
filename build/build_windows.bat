@@ -16,5 +16,5 @@ copy /Y "database\ponte.sql.example" "dist\ConsultaTaxasPontes\database\ponte.sq
 copy /Y "README.md" "dist\ConsultaTaxasPontes\LEIA-ME.txt" >nul
 
 echo.
-echo Build concluido: dist\ConsultaTaxasPontes\ConsultaTaxasPontes.exe
+echo Build concluido: Consulta de Taxas de Pontes`r`necho Executavel: dist\ConsultaTaxasPontes\ConsultaTaxasPontes.exe
 echo Copie database\ponte.sql para dist\ConsultaTaxasPontes\database\ponte.sql
