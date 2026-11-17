@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.core.models import NumericRange, SearchCriteria
-from app.core.validation import parse_input_number
+from app.core.validation import format_display_value, parse_input_number
 from app.data.repository import SQLRepository
 from app.services.search_service import SearchService
 
@@ -161,9 +161,9 @@ class MainWindow(QMainWindow):
         self.table.setHorizontalHeaderLabels(columns)
         for row_index, record in enumerate(records):
             for column_index, key in enumerate(columns):
-                value = record.get(key)
+                value = format_display_value(record.get(key))
                 self.table.setItem(
                     row_index, column_index,
-                    QTableWidgetItem("" if value is None else str(value)),
+                    QTableWidgetItem(value),
                 )
         self.table.resizeColumnsToContents()
