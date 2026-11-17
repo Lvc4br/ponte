@@ -12,19 +12,23 @@ O objetivo é facilitar a organização de referências técnicas e planilhas de
 - Leitura de base SQL local, aceitando tabelas obras e analise_oaes.
 - Armazenamento da base ativa em SQLite local.
 - Consulta com filtros por tipo de obra, largura, vão e comprimento total.
-- Importação aditiva de planilhas Excel .xlsx, com seleção da aba e prévia antes da confirmação.
+- Importação aditiva de planilhas Excel .xlsx, com detecção da linha de cabeçalho, seleção da aba e prévia antes da confirmação.
+- Validação de cabeçalhos equivalentes duplicados.
 - Exclusão de registros selecionados, com confirmação e backup local.
 - Preservação de campos adicionais, valores ausentes e intervalos textuais.
+- Registros sem dimensões verificáveis não são tratados como correspondências confirmadas quando o filtro correspondente está ativo.
 - Resumo da consulta e estatísticas descritivas para indicadores disponíveis.
-- Testes automatizados no GitHub Actions para Windows e Ubuntu, Python 3.11, 3.12 e 3.13.
+- Testes locais no Windows: 40 aprovados.
+- Testes automatizados no GitHub Actions para Windows e Ubuntu, Python 3.11, 3.12 e 3.13 (6/6 ambientes aprovados).
+- Validação funcional no Windows pelo usuário: pesquisa, importação Excel e estatísticas confirmadas funcionando.
 - Pipeline de empacotamento para Windows x64 com PyInstaller.
 
 ### Estado da distribuição
 
 - Existe um release publicado: **v0.1.0**.
-- O ZIP desse release foi produzido antes da implementação mais recente de importação Excel e gerenciamento de registros. Portanto, **não representa todas as funcionalidades atualmente presentes na branch main**.
-- A branch main contém código mais recente, incluindo importação Excel e exclusão de registros. O workflow de testes mais recente passou nos seis ambientes da matriz.
-- É necessário gerar um novo release para distribuir a versão com essas funcionalidades.
+- O ZIP desse release foi produzido antes da implementação mais recente de importação Excel, gerenciamento de registros e correções de pesquisa. Portanto, **não representa todas as funcionalidades atualmente presentes na branch main**.
+- A versão atual da branch main foi validada localmente no Windows e passou no workflow de testes nos seis ambientes.
+- O próximo passo é gerar um novo release Windows x64 com o código validado.
 
 [Ver código-fonte](https://github.com/Lvc4br/ponte) · [Ver Releases](https://github.com/Lvc4br/ponte/releases) · [Ver testes automatizados](https://github.com/Lvc4br/ponte/actions/workflows/tests.yml)
 
@@ -37,18 +41,19 @@ O objetivo é facilitar a organização de referências técnicas e planilhas de
 - Mantém os campos originais e campos adicionais existentes na fonte.
 - Filtra registros por tipo de obra, largura, vão e comprimento total.
 - Considera intervalos de vão por sobreposição, quando a fonte disponibiliza limites.
-- Mantém registros com dados incompletos para não perder informação.
+- Mantém registros com dados incompletos na base, sem tratá-los como correspondências confirmadas quando um filtro depende de um valor ausente.
 
 ### 2. Administração da base e planilhas
 
 - Permite adicionar registros de arquivos Excel .xlsx.
+- Detecta a linha de cabeçalho mesmo quando existem títulos ou linhas vazias antes dela.
 - Permite selecionar a aba, visualizar uma prévia e confirmar a inclusão.
 - A importação é aditiva: os registros existentes não são substituídos.
 - Permite selecionar e excluir um ou mais registros da base ativa.
 - Solicita confirmação antes da exclusão e cria backup local da base.
 - Não remove duplicidades automaticamente e não altera a planilha original.
 
-A importação atual usa os cabeçalhos encontrados na planilha e alguns aliases conhecidos. Ainda não há uma tela de mapeamento manual de colunas, importação de .xls, importação de PDF/Word ou gerenciamento de arquivos anexos.
+A importação atual usa os cabeçalhos encontrados na planilha e aliases conhecidos. Ainda não há uma tela de mapeamento manual de colunas, importação de .xls, importação de PDF/Word ou gerenciamento de arquivos anexos.
 
 ### 3. Indicadores e estatísticas
 
@@ -80,7 +85,7 @@ Os bancos locais, planilhas de trabalho e SQL real são ignorados pelo Git. Rele
 3. Coloque o SQL autorizado em database/ponte.sql, caso vá inicializar a base a partir de SQL.
 4. Execute ConsultaTaxasPontes.exe.
 
-O modelo database/ponte.sql.example não contém dados reais. O release v0.1.0 não inclui as funcionalidades adicionadas posteriormente à branch principal; consulte o estado dos workflows e aguarde um release atualizado para obter o pacote mais recente.
+O modelo database/ponte.sql.example não contém dados reais. O release v0.1.0 não inclui as funcionalidades e correções adicionadas posteriormente à branch principal; aguarde o novo release para obter o pacote atualizado.
 
 ### Executar pelo código-fonte
 
