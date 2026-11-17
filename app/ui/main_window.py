@@ -3,8 +3,8 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
-    QInputDialog, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
-    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QInputDialog, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton,
+    QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget,
 )
 
 from app.core.analytics import RATE_FIELDS, summarize_rates
@@ -53,15 +53,22 @@ class MainWindow(QMainWindow):
         ))
 
         bar = QHBoxLayout()
-        reload_button = QPushButton("Recarregar arquivo SQL")
-        reload_button.clicked.connect(self.load_sql)
-        bar.addWidget(reload_button)
-        import_button = QPushButton("Adicionar registros do Excel")
-        import_button.clicked.connect(self.import_excel)
-        bar.addWidget(import_button)
-        delete_button = QPushButton("Excluir selecionados")
-        delete_button.clicked.connect(self.delete_selected)
-        bar.addWidget(delete_button)
+        self.actions_button = QToolButton()
+        self.actions_button.setText("⋮")
+        self.actions_button.setToolTip("Ações da base de dados")
+        self.actions_button.setAccessibleName("Ações da base de dados")
+        self.actions_button.setPopupMode(
+            QToolButton.ToolButtonPopupMode.InstantPopup
+        )
+        actions_menu = QMenu(self.actions_button)
+        reload_action = actions_menu.addAction("Recarregar arquivo SQL")
+        reload_action.triggered.connect(self.load_sql)
+        import_action = actions_menu.addAction("Adicionar registros do Excel")
+        import_action.triggered.connect(self.import_excel)
+        delete_action = actions_menu.addAction("Excluir selecionados")
+        delete_action.triggered.connect(self.delete_selected)
+        self.actions_button.setMenu(actions_menu)
+        bar.addWidget(self.actions_button)
         self.status = QLabel("Carregando base SQL...")
         bar.addWidget(self.status, 1)
         layout.addLayout(bar)
@@ -316,6 +323,11 @@ class MainWindow(QMainWindow):
             self.status.setText(f"{len(self.results)} registro(s) retornado(s)")
         except ValueError as exc:
             QMessageBox.warning(self, "Filtros inválidos", str(exc))
+        except Exception as exc:
+            QMessageBox.critical(
+                self, "Falha na pesquisa",
+                f"Não foi possível concluir a pesquisa.\n\nDetalhes: {exc}"
+            )
 
     def clear(self):
         self.type_input.clear()
