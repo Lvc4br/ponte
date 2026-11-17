@@ -61,13 +61,12 @@ def read_excel(path, sheet_name=None):
             name = name or f"coluna_{index}"
             headers.append(name)
             canonical = _NORMALIZED_ALIASES.get(_normalize_header(name), name)
-            if canonical != name:
-                if canonical in canonical_columns:
-                    raise ValueError(
-                        f"Mais de uma coluna representa '{canonical}'. "
-                        "Mantenha apenas uma coluna equivalente ou renomeie os cabeçalhos."
-                    )
-                canonical_columns[canonical] = name
+            if canonical in canonical_columns:
+                raise ValueError(
+                    f"Mais de uma coluna representa '{canonical}'. "
+                    "Mantenha apenas uma coluna equivalente ou renomeie os cabeçalhos."
+                )
+            canonical_columns[canonical] = name
         if len(set(headers)) != len(headers):
             raise ValueError("Existem cabeçalhos repetidos; renomeie-os antes de importar.")
 
