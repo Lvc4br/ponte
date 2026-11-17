@@ -1,8 +1,10 @@
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
-    QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
+    QWidget, QHeaderView,
 )
 
 from app.core.analytics import RATE_FIELDS, summarize_rates
@@ -13,11 +15,25 @@ from app.data.repository import SQLRepository
 from app.services.search_service import SearchService
 
 
+RATE_LABELS = {
+    "em_m3_m2": "Concreto (em_m3_m2)",
+    "Paf_kg_m2": "Paf_kg_m2",
+    "Pap_kg_m2": "Pap_kg_m2",
+    "Af_m2_m2": "Af_m2_m2",
+}
+
+
+def _pt_number(value):
+    if value is None:
+        return "—"
+    return f"{value:,.3f}".replace(",", "_").replace(".", ",").replace("_", ".")
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("ConsultaTaxasPontes")
-        self.resize(1250, 780)
+        self.resize(1320, 850)
         self.repo = SQLRepository()
         self.service = SearchService()
         self.results = []
@@ -31,8 +47,8 @@ class MainWindow(QMainWindow):
         title.setStyleSheet("font-size:22px;font-weight:700;color:#173b57")
         layout.addWidget(title)
         layout.addWidget(QLabel(
-            "Informe os parâmetros para localizar referências históricas. "
-            "O sistema não realiza dimensionamento estrutural."
+            "Referências históricas para consulta. O sistema não realiza "
+            "dimensionamento nem validação estrutural."
         ))
 
         bar = QHBoxLayout()
@@ -77,19 +93,48 @@ class MainWindow(QMainWindow):
         buttons.addStretch()
         layout.addLayout(buttons)
 
-        summary_group = QGroupBox("Resumo dos resultados")
+        summary_group = QGroupBox("Resumo da consulta")
         summary_layout = QVBoxLayout(summary_group)
-        self.match_summary = QLabel("Carregue a base para visualizar o resumo.")
-        self.match_summary.setWordWrap(True)
-        summary_layout.addWidget(self.match_summary)
-        self.rate_summary = QLabel("")
-        self.rate_summary.setWordWrap(True)
-        summary_layout.addWidget(self.rate_summary)
+        self.summary_headline = QLabel("Carregue a base para consultar.")
+        self.summary_headline.setStyleSheet("font-size:15px;font-weight:700;color:#173b57")
+        self.summary_headline.setWordWrap(True)
+        summary_layout.addWidget(self.summary_headline)
+
+        self.summary_detail = QLabel("")
+        self.summary_detail.setWordWrap(True)
+        summary_layout.addWidget(self.summary_detail)
+
+        self.rate_table = QTableWidget(0, 7)
+        self.rate_table.setHorizontalHeaderLabels([
+            "Indicador (coluna de origem)", "Valores válidos", "Cobertura",
+            "Média", "Mediana", "Mínimo", "Máximo",
+        ])
+        self.rate_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.rate_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.rate_table.setAlternatingRowColors(True)
+        self.rate_table.verticalHeader().setVisible(False)
+        self.rate_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.rate_table.horizontalHeader().setStretchLastSection(True)
+        summary_layout.addWidget(self.rate_table)
+        note = QLabel(
+            "Estatísticas calculadas por registro, não por obra única. "
+            "Valores ausentes e textos não numéricos são excluídos apenas do "
+            "cálculo daquele indicador. Os nomes das colunas foram preservados; "
+            "a interpretação técnica de Paf, Pap e Af depende da documentação da fonte."
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet("color:#596579;font-size:11px")
+        summary_layout.addWidget(note)
         layout.addWidget(summary_group)
 
         self.table = QTableWidget()
         self.table.setAlternatingRowColors(True)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setSortingEnabled(True)
+        self.table.verticalHeader().setVisible(False)
         layout.addWidget(self.table, 1)
         self.setCentralWidget(root)
         self.setStyleSheet(
@@ -145,7 +190,7 @@ class MainWindow(QMainWindow):
         if not self.repo.records:
             QMessageBox.information(
                 self, "Base necessária",
-                "Crie database/ponte.sql a partir de database/ponte.sql.example e cadastre as obras."
+                "Coloque database/ponte.sql na pasta do aplicativo e cadastre os dados autorizados."
             )
             return
         try:
@@ -166,43 +211,59 @@ class MainWindow(QMainWindow):
         self.status.setText(f"{len(self.results)} registros carregados")
 
     def _show_summary(self, records, criteria=None):
+        source_count = len(self.repo.records)
+        result_count = len(records)
         if criteria is None:
-            self.match_summary.setText(
-                f"Registros exibidos: {len(records)}. Nenhum filtro de compatibilidade está ativo."
+            self.summary_headline.setText(
+                f"Base carregada: {source_count} registros históricos."
+            )
+            self.summary_detail.setText(
+                "Nenhum filtro ativo. As estatísticas abaixo consideram todos os registros."
             )
         else:
             uncertain = sum(bool(missing_criteria_fields(r, criteria)) for r in records)
-            confirmed = len(records) - uncertain
-            self.match_summary.setText(
-                f"Registros retornados: {len(records)} | "
-                f"Compatibilidade verificável nos filtros preenchidos: {confirmed} | "
-                f"Dados insuficientes para confirmar todos os filtros: {uncertain}. "
-                "Registros incompletos são mantidos e não devem ser tratados como "
-                "compatibilidade confirmada."
+            verified = result_count - uncertain
+            rejected = max(0, source_count - result_count)
+            self.summary_headline.setText(
+                f"{result_count} registros retornados de {source_count} registros da base."
+            )
+            self.summary_detail.setText(
+                f"Compatibilidade verificável nos filtros preenchidos: {verified}  |  "
+                f"Dados insuficientes para confirmar todos os filtros: {uncertain}  |  "
+                f"Não retornados por divergência nos dados disponíveis: {rejected}.\n"
+                "Os registros com dados incompletos permanecem na lista para não "
+                "descartar referências históricas; confira-os antes de comparar."
             )
 
         summaries = summarize_rates(records)
-        lines = [
-            "Estatísticas por registro (não deduplicadas por obra); "
-            "valores ausentes não são estimados:"
-        ]
-        for field in RATE_FIELDS:
+        self.rate_table.setSortingEnabled(False)
+        self.rate_table.setRowCount(len(RATE_FIELDS))
+        for row, field in enumerate(RATE_FIELDS):
             item = summaries[field]
-            if item["count"] == 0:
-                lines.append(f"{field}: sem valores numéricos disponíveis")
-            else:
-                lines.append(
-                    f"{field}: n={item['count']} | média={item['mean']:.3f} | "
-                    f"mediana={item['median']:.3f} | "
-                    f"mínimo={item['minimum']:.3f} | máximo={item['maximum']:.3f}"
-                )
-        self.rate_summary.setText("\n".join(lines))
+            count = item["count"]
+            coverage = (100 * count / result_count) if result_count else 0
+            values = [
+                RATE_LABELS.get(field, field),
+                str(count),
+                f"{coverage:.1f}%".replace(".", ","),
+                _pt_number(item["mean"]),
+                _pt_number(item["median"]),
+                _pt_number(item["minimum"]),
+                _pt_number(item["maximum"]),
+            ]
+            for column, value in enumerate(values):
+                cell = QTableWidgetItem(value)
+                if column > 0:
+                    cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.rate_table.setItem(row, column, cell)
+        self.rate_table.setSortingEnabled(True)
 
     def show_records(self, records, criteria=None):
         self._show_summary(records, criteria)
         columns = list(dict.fromkeys(
             key for record in records for key in record.values
         ))
+        self.table.setSortingEnabled(False)
         self.table.clear()
         self.table.setRowCount(len(records))
         self.table.setColumnCount(len(columns))
@@ -215,3 +276,4 @@ class MainWindow(QMainWindow):
                     QTableWidgetItem(value),
                 )
         self.table.resizeColumnsToContents()
+        self.table.setSortingEnabled(True)
