@@ -1,8 +1,15 @@
 from pathlib import Path
-from app.data.excel_reader import read_excel_records
-class ExcelRepository:
-    def __init__(self): self.records=[]; self.source=None
-    def load(self, path, sheet_name='Base_limpa'):
-        self.records=read_excel_records(path, sheet_name)
-        self.source=Path(path)
+
+from app.data.sql_loader import DEFAULT_DB, DEFAULT_SQL, load_sql_database
+
+
+class SQLRepository:
+    def __init__(self):
+        self.records = []
+        self.source = None
+        self.database_path = Path(DEFAULT_DB)
+
+    def load(self, sql_path=DEFAULT_SQL):
+        self.records = load_sql_database(sql_path, self.database_path)
+        self.source = Path(sql_path)
         return self.records
