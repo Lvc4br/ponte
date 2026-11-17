@@ -2,7 +2,7 @@
 
 ## [0.1.0] - Em preparação
 
-- Aplicativo desktop de consulta de referências históricas de pontes.
+- Aplicativo desktop de consulta de referências e taxas de pontes.
 - Importação de dados por script SQL local, com persistência SQLite.
 - Filtros independentes de tipo de obra, largura, vão e comprimento.
 - Resumo de qualidade da consulta e estatísticas descritivas por coluna.
