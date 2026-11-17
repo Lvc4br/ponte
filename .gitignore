@@ -1,0 +1,13 @@
+.venv/
+python/
+python-runtime/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+build/
+dist/
+.env
+.vscode/
+.idea/
+*.xlsx
+*.xls
