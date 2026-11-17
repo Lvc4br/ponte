@@ -2,7 +2,7 @@ import sqlite3
 
 import pytest
 
-from app.data.sql_loader import load_sql_database
+from app.data.sql_loader import application_directory, load_sql_database
 
 
 def test_load_sql_script_and_rebuild_database(tmp_path):
@@ -75,3 +75,7 @@ def test_requires_core_columns(tmp_path):
     )
     with pytest.raises(ValueError, match="comprimento"):
         load_sql_database(sql, tmp_path / "db.sqlite")
+
+
+def test_application_directory_is_a_path():
+    assert application_directory().is_dir()
