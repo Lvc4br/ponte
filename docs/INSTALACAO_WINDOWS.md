@@ -1,4 +1,4 @@
-# Instalação Windows
+# Instalação — Consulta de Taxas de Pontes
 
 ## Versão portátil
 
