@@ -48,14 +48,16 @@ def _find_header_row(rows, scan_limit=30):
     best_index = None
     best_score = 0
     for index, row in enumerate(rows[:scan_limit]):
-        recognized = {
+        recognized = [
             _NORMALIZED_ALIASES[_normalize_header(value)]
             for value in row
             if value is not None
             and _normalize_header(value) in _NORMALIZED_ALIASES
-        }
-        if len(recognized) > best_score:
-            best_index, best_score = index, len(recognized)
+        ]
+        # Count equivalent duplicate columns so validation can report them.
+        score = len(recognized)
+        if score > best_score:
+            best_index, best_score = index, score
     if best_index is None or best_score < 2:
         raise ValueError(
             "Não foi possível identificar o cabeçalho da planilha. "
