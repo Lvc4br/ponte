@@ -1,0 +1,80 @@
+import json
+import sqlite3
+from pathlib import Path
+
+from app.core.models import BridgeRecord
+from app.data.sql_loader import APP_DIR
+
+
+DEFAULT_STORE = APP_DIR / "data" / "registros.sqlite3"
+
+
+class DatasetStore:
+    """Persistent local dataset, independent from the original SQL source."""
+
+    def __init__(self, path=DEFAULT_STORE):
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    payload TEXT NOT NULL
+                )
+                """
+            )
+
+    def count(self):
+        with sqlite3.connect(self.path) as connection:
+            return connection.execute("SELECT COUNT(*) FROM records").fetchone()[0]
+
+    def load(self):
+        with sqlite3.connect(self.path) as connection:
+            rows = connection.execute(
+                "SELECT id, payload FROM records ORDER BY id"
+            ).fetchall()
+        return [
+            BridgeRecord(json.loads(payload), row_id)
+            for row_id, payload in rows
+        ]
+
+    def initialize_if_empty(self, records):
+        if self.count():
+            return self.load()
+        self.append(records)
+        return self.load()
+
+    def append(self, records):
+        prepared = [
+            (json.dumps(record.values, ensure_ascii=False, default=str),)
+            for record in records
+        ]
+        if not prepared:
+            return 0
+        with sqlite3.connect(self.path) as connection:
+            connection.executemany(
+                "INSERT INTO records(payload) VALUES (?)", prepared
+            )
+        return len(prepared)
+
+    def delete(self, record_ids):
+        ids = list(dict.fromkeys(int(value) for value in record_ids))
+        if not ids:
+            return 0
+        placeholders = ",".join("?" for _ in ids)
+        with sqlite3.connect(self.path) as connection:
+            cursor = connection.execute(
+                f"DELETE FROM records WHERE id IN ({placeholders})", ids
+            )
+            return cursor.rowcount
+
+    def backup(self):
+        if not self.path.exists():
+            return None
+        destination = self.path.with_name(
+            f"{self.path.stem}.backup{self.path.suffix}"
+        )
+        with sqlite3.connect(self.path) as source, sqlite3.connect(destination) as target:
+            source.backup(target)
+        return destination
