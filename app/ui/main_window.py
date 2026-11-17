@@ -162,8 +162,12 @@ class MainWindow(QMainWindow):
             records = self.repo.load()
             self.results = records
             self.show_records(records)
+            source_label = (
+                Path(self.repo.source).name if self.repo.source
+                else "Base local salva"
+            )
             self.status.setText(
-                f"{Path(self.repo.source).name} — {len(records)} registros ativos"
+                f"{source_label} — {len(records)} registros ativos"
             )
         except Exception as exc:
             self.results = self.repo.records
