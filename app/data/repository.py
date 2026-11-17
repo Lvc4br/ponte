@@ -9,9 +9,19 @@ class SQLRepository:
         self.records = []
         self.source = None
         self.store = DatasetStore()
+        self.records = self.store.load()
 
     def load(self, sql_path=DEFAULT_SQL):
-        source_records = load_sql_database(sql_path)
+        try:
+            source_records = load_sql_database(sql_path)
+        except Exception:
+            # A previously imported/edited local dataset remains usable even if
+            # the original SQL file is temporarily unavailable or invalid.
+            self.records = self.store.load()
+            if self.records:
+                self.source = None
+                return self.records
+            raise
         self.records = self.store.initialize_if_empty(source_records)
         self.source = Path(sql_path)
         return self.records
