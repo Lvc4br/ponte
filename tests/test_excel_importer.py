@@ -65,3 +65,29 @@ def test_excel_import_rejects_duplicate_canonical_columns(tmp_path):
 
     with pytest.raises(ValueError, match="Mais de uma coluna"):
         read_excel(path)
+
+
+
+def test_imported_excel_records_can_be_filtered_by_dimensions(tmp_path):
+    from app.core.matching import filter_records
+    from app.core.models import NumericRange, SearchCriteria
+
+    path = tmp_path / "pesquisa.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["Largura (m)", "Vão (m)", "Comprimento total (m)"])
+    sheet.append([12.5, "41,25 - 41,80", 120])
+    sheet.append([8.0, "20,0", 45])
+    workbook.save(path)
+
+    records = read_excel(path)
+    result = filter_records(
+        records,
+        SearchCriteria(
+            width=NumericRange(12, 13),
+            span=NumericRange(41.5, 42),
+            total_length=NumericRange(100, 130),
+        ),
+    )
+    assert len(result) == 1
+    assert result[0].get("largura_m") == 12.5
