@@ -11,10 +11,11 @@ def parse_number(value):
     text = str(value).strip().replace(" ", "")
     if not text or text.lower() in {"nan", "none", "n/a", "-"}:
         return None
-    if "," in text and "." not in text:
-        text = text.replace(",", ".")
-    elif "," in text and "." in text:
+    # Brazilian notation (1.234,56) and decimal point (1234.56).
+    if "," in text and "." in text:
         text = text.replace(".", "").replace(",", ".")
+    elif "," in text:
+        text = text.replace(",", ".")
     try:
         return float(text)
     except ValueError:
@@ -31,6 +32,34 @@ def parse_input_number(value, field_name):
             f"{field_name}: informe um número válido (ex.: 12,5) ou deixe o campo vazio."
         )
     return number
+
+
+def format_display_value(value):
+    """Display scalar decimal values with a comma without changing stored data."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return format(value, ".15g").replace(".", ",")
+
+    original = str(value)
+    text = original.strip()
+    if not text or ("," not in text and "." not in text):
+        return original
+    # Preserve source intervals and formulas exactly as supplied.
+    if "-" in text or "+" in text:
+        return original
+    number = parse_number(text)
+    if number is None or not isfinite(number):
+        return original
+    separator = "," if "," in text else "."
+    decimals = len(text.rsplit(separator, 1)[-1])
+    if decimals == 0:
+        return original
+    return f"{number:.{decimals}f}".replace(".", ",")
 
 
 def parse_range(value):
