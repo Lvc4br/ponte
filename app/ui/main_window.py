@@ -1,59 +1,162 @@
 from pathlib import Path
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QPushButton,QLabel,QLineEdit,QFileDialog,QTableWidget,QTableWidgetItem,QMessageBox,QGroupBox,QFormLayout
-from app.data.repository import ExcelRepository
-from app.core.models import NumericRange,SearchCriteria
+
+from PySide6.QtWidgets import (
+    QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+    QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+)
+
+from app.core.models import NumericRange, SearchCriteria
 from app.core.validation import parse_number
+from app.data.repository import SQLRepository
 from app.services.search_service import SearchService
-from app.services.export_service import export_records
+
 
 class MainWindow(QMainWindow):
- def __init__(self):
-  super().__init__(); self.setWindowTitle('ConsultaTaxasPontes'); self.resize(1150,700); self.repo=ExcelRepository(); self.service=SearchService(); self.results=[]; self._build()
- def _build(self):
-  root=QWidget(); layout=QVBoxLayout(root)
-  title=QLabel('Consulta de taxas históricas de pontes'); title.setStyleSheet('font-size:22px;font-weight:700;color:#173b57')
-  layout.addWidget(title); layout.addWidget(QLabel('Pesquise obras de referência por largura, vão e comprimento total.'))
-  bar=QHBoxLayout(); load=QPushButton('Abrir planilha Excel'); load.clicked.connect(self.load_excel); bar.addWidget(load); self.status=QLabel('Nenhuma planilha carregada'); bar.addWidget(self.status,1); layout.addLayout(bar)
-  group=QGroupBox('Intervalos de pesquisa (m)'); form=QFormLayout(group); self.fields={}
-  for key,label in [('width','Largura'),('span','Vão'),('total_length','Comprimento total')]:
-   pair=QWidget(); row=QHBoxLayout(pair); row.setContentsMargins(0,0,0,0); lo=QLineEdit(); hi=QLineEdit(); lo.setPlaceholderText('Mínimo'); hi.setPlaceholderText('Máximo'); row.addWidget(lo); row.addWidget(hi); form.addRow(label,pair); self.fields[key]=(lo,hi)
-  layout.addWidget(group)
-  buttons=QHBoxLayout()
-  for label,slot in [('Pesquisar',self.search),('Limpar filtros',self.clear),('Exportar resultados',self.export)]:
-   b=QPushButton(label); b.clicked.connect(slot); buttons.addWidget(b)
-  buttons.addStretch(); layout.addLayout(buttons)
-  self.table=QTableWidget(); self.table.setAlternatingRowColors(True); self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers); layout.addWidget(self.table,1)
-  self.setCentralWidget(root); self.setStyleSheet('QMainWindow{background:#f5f7fb} QGroupBox{font-weight:600;border:1px solid #d8dee9;border-radius:8px;margin-top:8px;padding:10px} QLineEdit,QTableWidget{background:white;border:1px solid #d8dee9;border-radius:5px;padding:6px} QPushButton{background:#173b57;color:white;border:0;border-radius:6px;padding:9px 14px} QPushButton:hover{background:#245878}')
- def load_excel(self):
-  path,_=QFileDialog.getOpenFileName(self,'Selecionar planilha','','Excel (*.xlsx *.xls)')
-  if not path:return
-  try:
-   records=self.repo.load(path); self.results=records; self.status.setText(f'{Path(path).name} — {len(records)} obras carregadas'); self.show_records(records)
-  except Exception as exc: QMessageBox.critical(self,'Erro ao abrir planilha',str(exc))
- def criteria(self):
-  data={}
-  for key,(lo,hi) in self.fields.items():
-   a=parse_number(lo.text()) if lo.text().strip() else None; b=parse_number(hi.text()) if hi.text().strip() else None
-   if a is not None and b is not None and a>b: raise ValueError('O mínimo não pode ser maior que o máximo.')
-   data[key]=NumericRange(a if a is not None else float('-inf'),b if b is not None else float('inf')) if a is not None or b is not None else None
-  return SearchCriteria(**data)
- def search(self):
-  if not self.repo.records: QMessageBox.information(self,'Planilha necessária','Abra uma planilha primeiro.'); return
-  try:
-   self.results=self.service.search(self.repo.records,self.criteria()); self.show_records(self.results); self.status.setText(f'{len(self.results)} resultado(s)')
-  except ValueError as exc: QMessageBox.warning(self,'Filtros inválidos',str(exc))
- def clear(self):
-  for pair in self.fields.values(): pair[0].clear(); pair[1].clear()
-  self.results=self.repo.records; self.show_records(self.results)
- def show_records(self,records):
-  cols=list(dict.fromkeys(k for r in records for k in r.values)); self.table.clear(); self.table.setRowCount(len(records)); self.table.setColumnCount(len(cols)); self.table.setHorizontalHeaderLabels(cols)
-  for i,r in enumerate(records):
-   for j,k in enumerate(cols): self.table.setItem(i,j,QTableWidgetItem('' if r.get(k) is None else str(r.get(k))))
-  self.table.resizeColumnsToContents()
- def export(self):
-  if not self.results: QMessageBox.information(self,'Sem resultados','Não há resultados para exportar.'); return
-  path,_=QFileDialog.getSaveFileName(self,'Exportar resultados','resultados_pontes.xlsx','Excel (*.xlsx)')
-  if path:
-   try: export_records(self.results,path); QMessageBox.information(self,'Concluído',f'Arquivo salvo em:\n{path}')
-   except Exception as exc: QMessageBox.critical(self,'Erro na exportação',str(exc))
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("ConsultaTaxasPontes")
+        self.resize(1150, 700)
+        self.repo = SQLRepository()
+        self.service = SearchService()
+        self.results = []
+        self._build()
+        self.load_sql()
+
+    def _build(self):
+        root = QWidget()
+        layout = QVBoxLayout(root)
+        title = QLabel("Consulta de taxas históricas de pontes")
+        title.setStyleSheet("font-size:22px;font-weight:700;color:#173b57")
+        layout.addWidget(title)
+        layout.addWidget(QLabel(
+            "Informe o tipo de obra e as dimensões para localizar referências históricas."
+        ))
+
+        bar = QHBoxLayout()
+        reload_button = QPushButton("Recarregar arquivo SQL")
+        reload_button.clicked.connect(self.load_sql)
+        bar.addWidget(reload_button)
+        self.status = QLabel("Carregando base SQL...")
+        bar.addWidget(self.status, 1)
+        layout.addLayout(bar)
+
+        group = QGroupBox("Parâmetros de pesquisa")
+        form = QFormLayout(group)
+        self.type_input = QLineEdit()
+        self.type_input.setPlaceholderText("Ex.: Ponte (opcional)")
+        form.addRow("Tipo de obra", self.type_input)
+        self.fields = {}
+        for key, label in [
+            ("width", "Largura (m)"),
+            ("span", "Vão (m)"),
+            ("total_length", "Comprimento total (m)"),
+        ]:
+            pair = QWidget()
+            row = QHBoxLayout(pair)
+            row.setContentsMargins(0, 0, 0, 0)
+            low, high = QLineEdit(), QLineEdit()
+            low.setPlaceholderText("Mínimo")
+            high.setPlaceholderText("Máximo")
+            row.addWidget(low)
+            row.addWidget(high)
+            form.addRow(label, pair)
+            self.fields[key] = (low, high)
+        layout.addWidget(group)
+
+        buttons = QHBoxLayout()
+        for label, slot in [
+            ("Pesquisar", self.search),
+            ("Limpar filtros", self.clear),
+        ]:
+            button = QPushButton(label)
+            button.clicked.connect(slot)
+            buttons.addWidget(button)
+        buttons.addStretch()
+        layout.addLayout(buttons)
+
+        self.table = QTableWidget()
+        self.table.setAlternatingRowColors(True)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout.addWidget(self.table, 1)
+        self.setCentralWidget(root)
+        self.setStyleSheet(
+            "QMainWindow{background:#f5f7fb} "
+            "QGroupBox{font-weight:600;border:1px solid #d8dee9;"
+            "border-radius:8px;margin-top:8px;padding:10px} "
+            "QLineEdit,QTableWidget{background:white;border:1px solid "
+            "#d8dee9;border-radius:5px;padding:6px} "
+            "QPushButton{background:#173b57;color:white;border:0;"
+            "border-radius:6px;padding:9px 14px} "
+            "QPushButton:hover{background:#245878}"
+        )
+
+    def load_sql(self):
+        try:
+            records = self.repo.load()
+            self.results = records
+            self.show_records(records)
+            self.status.setText(
+                f"{Path(self.repo.source).name} — {len(records)} obras carregadas"
+            )
+        except Exception as exc:
+            self.results = []
+            self.show_records([])
+            self.status.setText("Base SQL não carregada")
+            QMessageBox.warning(self, "Não foi possível carregar a base SQL", str(exc))
+
+    def criteria(self):
+        data = {}
+        for key, (low, high) in self.fields.items():
+            minimum = parse_number(low.text()) if low.text().strip() else None
+            maximum = parse_number(high.text()) if high.text().strip() else None
+            if minimum is not None and maximum is not None and minimum > maximum:
+                raise ValueError("O mínimo não pode ser maior que o máximo.")
+            data[key] = (
+                NumericRange(
+                    minimum if minimum is not None else float("-inf"),
+                    maximum if maximum is not None else float("inf"),
+                )
+                if minimum is not None or maximum is not None else None
+            )
+        type_value = self.type_input.text().strip() or None
+        return SearchCriteria(**data, type_obra=type_value)
+
+    def search(self):
+        if not self.repo.records:
+            QMessageBox.information(
+                self, "Base necessária",
+                "Crie database/ponte.sql a partir de database/ponte.sql.example e cadastre as obras."
+            )
+            return
+        try:
+            self.results = self.service.search(self.repo.records, self.criteria())
+            self.show_records(self.results)
+            self.status.setText(f"{len(self.results)} obra(s) compatível(is)")
+        except ValueError as exc:
+            QMessageBox.warning(self, "Filtros inválidos", str(exc))
+
+    def clear(self):
+        self.type_input.clear()
+        for low, high in self.fields.values():
+            low.clear()
+            high.clear()
+        self.results = self.repo.records
+        self.show_records(self.results)
+        self.status.setText(f"{len(self.results)} obras carregadas")
+
+    def show_records(self, records):
+        columns = list(dict.fromkeys(
+            key for record in records for key in record.values
+        ))
+        self.table.clear()
+        self.table.setRowCount(len(records))
+        self.table.setColumnCount(len(columns))
+        self.table.setHorizontalHeaderLabels(columns)
+        for row_index, record in enumerate(records):
+            for column_index, key in enumerate(columns):
+                value = record.get(key)
+                self.table.setItem(
+                    row_index, column_index,
+                    QTableWidgetItem("" if value is None else str(value)),
+                )
+        self.table.resizeColumnsToContents()
