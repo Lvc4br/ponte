@@ -33,3 +33,35 @@ def test_dataset_store_add_load_and_delete(tmp_path):
     remaining = store.load()
     assert len(remaining) == 1
     assert remaining[0].get("obra") == 2
+
+
+def test_excel_import_normalizes_common_engineering_headers(tmp_path):
+    path = tmp_path / "cabecalhos.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append([
+        "Largura (m)", "Vão (m)", "Comprimento total (m)", "Tipo de obra"
+    ])
+    sheet.append([12.5, "41,25 - 41,80", 120, "Ponte"])
+    workbook.save(path)
+
+    record = read_excel(path)[0]
+    assert record.get("Largura (m)") == 12.5
+    assert record.get("largura_m") == 12.5
+    assert record.get("vao_m") == "41,25 - 41,80"
+    assert record.get("compr_obra_m") == 120
+    assert record.get("tipo_obra") == "Ponte"
+
+
+def test_excel_import_rejects_duplicate_canonical_columns(tmp_path):
+    import pytest
+
+    path = tmp_path / "colunas_duplicadas.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["largura_m", "Largura (m)"])
+    sheet.append([12, 13])
+    workbook.save(path)
+
+    with pytest.raises(ValueError, match="Mais de uma coluna"):
+        read_excel(path)
