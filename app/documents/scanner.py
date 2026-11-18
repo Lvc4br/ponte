@@ -63,7 +63,18 @@ class DocumentScanner:
             elif path.is_file():
                 candidates.append(path)
         unique = sorted({item.resolve() for item in candidates}, key=lambda item: str(item).casefold())
-        return [self.scan(item) for item in unique]
+        results = []
+        for item in unique:
+            try:
+                results.append(self.scan(item))
+            except Exception as exc:
+                results.append(DocumentScanResult(
+                    path=str(item), file_name=item.name, extension=item.suffix.lower(),
+                    mime_type=mimetypes.guess_type(item.name)[0], size_bytes=0,
+                    sha256="", status="error",
+                    errors=[f"{type(exc).__name__}: {exc}"],
+                ))
+        return results
 
     def scan(self, file_path: str | Path) -> DocumentScanResult:
         path = Path(file_path).expanduser().resolve()
