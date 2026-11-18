@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 from app.documents.index import DocumentIndex
 from app.workspace.exchange import SpreadsheetExchange
 from app.workspace.store import WorkspaceStore
+from app.workspace.spreadsheet import matches_condition, parse_cell_value
 
 
 STYLE = """
@@ -464,24 +465,7 @@ class SpreadsheetWindow(QMainWindow):
 
     @staticmethod
     def _parse_value(raw, data_type):
-        if raw == "":
-            return None
-        if data_type == "text":
-            return raw
-        if data_type == "integer":
-            return int(raw)
-        if data_type == "decimal":
-            return float(raw.replace(",", "."))
-        if data_type == "boolean":
-            normalized = raw.strip().casefold()
-            if normalized in {"true", "1", "sim", "yes"}:
-                return True
-            if normalized in {"false", "0", "não", "nao", "no"}:
-                return False
-            raise ValueError("Use sim/não ou verdadeiro/falso.")
-        if data_type in {"json"}:
-            return json.loads(raw)
-        return raw
+        return parse_cell_value(raw, data_type)
 
     def _new_project(self):
         name, ok = QInputDialog.getText(self, "Novo projeto", "Nome:")
@@ -608,27 +592,7 @@ class SpreadsheetWindow(QMainWindow):
 
     @staticmethod
     def _matches_condition(value, operator, target):
-        if value is None:
-            return operator == "está vazio"
-        if operator == "não está vazio":
-            return True
-        if operator == "contém":
-            return str(target).casefold() in str(value).casefold()
-        if operator == "começa com":
-            return str(value).casefold().startswith(str(target).casefold())
-        if operator == "igual a":
-            return value == target
-        if operator == "diferente de":
-            return value != target
-        if operator == "maior que":
-            return value > target
-        if operator == "maior ou igual a":
-            return value >= target
-        if operator == "menor que":
-            return value < target
-        if operator == "menor ou igual a":
-            return value <= target
-        return False
+        return matches_condition(value, operator, target)
 
     def _set_column_condition(self, column):
         name, kind = column["name"], column["data_type"]
