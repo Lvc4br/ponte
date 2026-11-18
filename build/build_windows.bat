@@ -8,14 +8,14 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b 1
 )
 
-.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --windowed --onedir --name ConsultaTaxasPontes --add-data "database\ponte.sql.example;database" main.py
+.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --windowed --onedir --name PONTE --collect-all pypdf --collect-all docx --collect-all pptx --collect-all openpyxl --collect-all xlrd --collect-all ezdxf --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-all pytesseract --add-data "database\ponte.sql.example;database" main.py
 if errorlevel 1 exit /b %errorlevel%
 
-if not exist "dist\ConsultaTaxasPontes\database" mkdir "dist\ConsultaTaxasPontes\database"
+if not exist "dist\PONTE\database" mkdir "dist\ConsultaTaxasPontes\database"
 copy /Y "database\ponte.sql.example" "dist\ConsultaTaxasPontes\database\ponte.sql.example" >nul
-copy /Y "README.md" "dist\ConsultaTaxasPontes\LEIA-ME.txt" >nul
+copy /Y "README.md" "dist\PONTE\LEIA-ME.txt" >nul
 
 echo.
-echo Build concluido: Consulta de Taxas de Pontes
-echo Executavel: dist\ConsultaTaxasPontes\ConsultaTaxasPontes.exe
-echo Copie database\ponte.sql para dist\ConsultaTaxasPontes\database\ponte.sql
+echo Build concluido: PONTE - Gerenciador Universal de Dados e Documentos
+echo Executavel: dist\PONTE\PONTE.exe
+echo Copie database\ponte.sql para dist\PONTE\database\ponte.sql
