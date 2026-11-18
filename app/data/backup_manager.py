@@ -36,7 +36,7 @@ class DatabaseBackupManager:
             raise BackupError(f"Arquivo de banco não encontrado: {path}")
         db = None
         try:
-            db = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+            db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
             integrity = db.execute("PRAGMA integrity_check").fetchone()[0]
             if integrity != "ok":
                 raise BackupError(f"Falha de integridade SQLite: {integrity}")
@@ -137,7 +137,7 @@ class DatabaseBackupManager:
         self.inspect(source, require_application_tables=True)
         if self.database_path.exists():
             if safety_backup is None:
-                stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                 safety_backup = self.database_path.with_name(
                     f"{self.database_path.stem}.antes_restauracao_{stamp}.sqlite3"
                 )
