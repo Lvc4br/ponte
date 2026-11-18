@@ -2,13 +2,13 @@
 setlocal
 cd /d "%~dp0.."
 
-if not exist ".venv\Scripts\python.exe" (
-    echo Ambiente virtual nao encontrado.
-    echo Execute primeiro a instalacao descrita em docs\INSTALACAO_WINDOWS.md.
-    exit /b 1
+if exist ".venv\Scripts\python.exe" (
+    set "PYTHON=.venv\Scripts\python.exe"
+) else (
+    set "PYTHON=python"
 )
 
-.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --windowed --onedir --name PONTE --collect-all pypdf --collect-all docx --collect-all pptx --collect-all openpyxl --collect-all xlrd --collect-all ezdxf --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-all pytesseract --add-data "database\ponte.sql.example;database" main.py
+%PYTHON% -m PyInstaller --noconfirm --clean --windowed --onedir --name PONTE --collect-all pypdf --collect-all docx --collect-all pptx --collect-all openpyxl --collect-all xlrd --collect-all ezdxf --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-all pytesseract --add-data "database\ponte.sql.example;database" main.py
 if errorlevel 1 exit /b %errorlevel%
 
 if not exist "dist\PONTE\database" mkdir "dist\PONTE\database"
