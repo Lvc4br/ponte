@@ -17,7 +17,7 @@
 - [x] Importação/exportação inicial de CSV e XLSX/XLSM.
 - [x] Migração aditiva do workspace SQLite v1 para v2.
 - [x] Associação de documentos do catálogo a projetos no backend.\n- [x] Backup SQLite consistente, manifesto SHA-256, verificação e restauração com cópia de segurança.\n- [x] Ações de backup/restauração na interface.\n- [x] Plano detalhado de testes de usuário e regressão.
-- [x] Scanner recursivo, catálogo documental e biblioteca integrada à interface.
+- [x] Scanner recursivo, catálogo documental e biblioteca integrada à interface.\n- [x] Progresso por arquivo e cancelamento seguro entre arquivos.
 - [x] Leitores iniciais de PDF, DOC/DOCX, PPT/PPTX, RTF, ODT/ODP, XLS/XLSX/XLSM/XLSB, CSV/TXT/MD/JSON/XML, imagens, DXF, DWG opcional, IFC opcional e reconhecimento RVT/RFA.
 - [x] Proteção inicial contra arquivos Office compactados suspeitos.
 - [x] Testes automatizados adicionados para workspace, fórmulas, importação/exportação, scanner e catálogo.
@@ -34,7 +34,7 @@
 - [ ] Conversão DOC/PPT/RTF/ODT/ODP com LibreOffice.
 - [ ] Conversão DWG com ODA File Converter.
 - [ ] Leitura IFC com IfcOpenShell.
-- [ ] Progresso por arquivo, cancelamento seguro e relatório exportável.
+- [ ] Relatório exportável da análise documental.
 - [ ] UX de edição em lote, copiar/colar, desfazer/refazer e filtros visuais.
 - [ ] Revisão de segurança, desempenho, acessibilidade e usabilidade.
 - [ ] Executar o [plano de testes de usuário](PLANO_TESTES_USUARIO.md) antes de considerar substituição de planilhas complexas.
