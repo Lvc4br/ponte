@@ -1,3 +1,14 @@
+# Changelog
+
+## Em desenvolvimento — navegação entre planilhas e revisão do workspace
+
+- Adicionada navegação em abas entre Todas, Base principal e cada planilha Excel importada.
+- Cada registro importado passa a manter arquivo e aba de origem no SQLite.
+- Permite importar abas diferentes do mesmo arquivo; a proteção contra duplicidade passa a identificar a combinação arquivo/aba por SHA-256.
+- Migração automática do banco local adiciona os metadados de origem sem apagar registros antigos.
+- Filtros e indicadores passam a considerar o conjunto de registros da aba selecionada.
+- Ajustes visuais nas abas, seleção da grade e hierarquia do workspace.
+
 # Histórico de alterações
 
 ## Não publicado — branch main
