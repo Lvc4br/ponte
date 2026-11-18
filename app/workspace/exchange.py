@@ -223,6 +223,22 @@ class SpreadsheetExchange:
                     self.store.delete_table(table_id)
                 raise
 
+    def preview_xlsb(self, path: str | Path, *, limit=5):
+        from pyxlsb import open_workbook
+
+        path = Path(path)
+        previews = []
+        with open_workbook(str(path)) as workbook:
+            for name in workbook.sheets:
+                with workbook.get_sheet(name) as sheet:
+                    rows = []
+                    for index, row in enumerate(sheet.rows()):
+                        if index >= max(1, int(limit) + 1):
+                            break
+                        rows.append([cell.v for cell in row])
+                previews.append({"sheet_name": name, "rows": rows})
+        return {"file_name": path.name, "sheets": previews}
+
     def preview_xls(self, path: str | Path, *, limit=5):
         import xlrd
 
