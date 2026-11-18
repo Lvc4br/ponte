@@ -1,6 +1,7 @@
 """Basic desktop workspace for generic projects and editable data tables."""
 
 import json
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
