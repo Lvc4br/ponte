@@ -130,3 +130,16 @@ def test_scans_dxf_entities_when_reader_is_installed(tmp_path):
     assert result.status == "success"
     assert result.metadata["entity_count"] == 1
     assert result.sections[0].kind == "cad_entities"
+
+
+def test_scans_directory_recursively_in_batch(tmp_path):
+    folder = tmp_path / "documentos"
+    nested = folder / "subpasta"
+    nested.mkdir(parents=True)
+    (folder / "a.txt").write_text("A", encoding="utf-8")
+    (nested / "b.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+
+    results = DocumentScanner().scan_many([folder])
+
+    assert [result.file_name for result in results] == ["a.txt", "b.csv"]
+    assert all(result.status == "success" for result in results)
