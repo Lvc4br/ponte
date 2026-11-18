@@ -334,8 +334,8 @@ class MainWindow(QMainWindow):
 
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setMinimumWidth(175)
-        sidebar.setMaximumWidth(205)
+        sidebar.setMinimumWidth(190)
+        sidebar.setMaximumWidth(245)
         side = QVBoxLayout(sidebar)
         side.setContentsMargins(10, 14, 10, 12)
         side.setSpacing(7)
@@ -362,13 +362,26 @@ class MainWindow(QMainWindow):
         side.addWidget(self.nav_workspace)
         side.addWidget(self.nav_documents)
 
-        side.addSpacing(12)
-        filter_title = QLabel("FILTROS DE CONSULTA")
-        filter_title.setObjectName("sectionTitle")
-        side.addWidget(filter_title)
+        side.addSpacing(10)
+        self.filters_toggle = QToolButton()
+        self.filters_toggle.setText("⌄  FILTROS DE CONSULTA")
+        self.filters_toggle.setCheckable(True)
+        self.filters_toggle.setChecked(True)
+        self.filters_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.filters_toggle.setStyleSheet(
+            "QToolButton { text-align:left; color:#e6a253; font-weight:800; "
+            "border:0; background:transparent; padding:8px 2px; }"
+            "QToolButton:hover { color:#f4c18a; background:#2b333e; }"
+        )
+        side.addWidget(self.filters_toggle)
+
+        self.filters_panel = QWidget()
+        filters_layout = QVBoxLayout(self.filters_panel)
+        filters_layout.setContentsMargins(0, 2, 0, 4)
+        filters_layout.setSpacing(7)
         self.type_input = QLineEdit()
         self.type_input.setPlaceholderText("Tipo de obra")
-        side.addWidget(self.type_input)
+        filters_layout.addWidget(self.type_input)
         self.fields = {}
         for key, label in [
             ("width", "Largura (m)"),
@@ -377,14 +390,15 @@ class MainWindow(QMainWindow):
         ]:
             caption = QLabel(label)
             caption.setObjectName("muted")
-            side.addWidget(caption)
+            filters_layout.addWidget(caption)
             pair = QHBoxLayout()
+            pair.setSpacing(6)
             low, high = QLineEdit(), QLineEdit()
             low.setPlaceholderText("Mín.")
             high.setPlaceholderText("Máx.")
             pair.addWidget(low)
             pair.addWidget(high)
-            side.addLayout(pair)
+            filters_layout.addLayout(pair)
             self.fields[key] = (low, high)
 
         search_button = QPushButton("Aplicar filtros")
@@ -392,8 +406,15 @@ class MainWindow(QMainWindow):
         search_button.clicked.connect(self.search)
         clear_button = QPushButton("Limpar filtros")
         clear_button.clicked.connect(self.clear)
-        side.addWidget(search_button)
-        side.addWidget(clear_button)
+        filters_layout.addWidget(search_button)
+        filters_layout.addWidget(clear_button)
+        side.addWidget(self.filters_panel)
+        self.filters_toggle.toggled.connect(self.filters_panel.setVisible)
+        self.filters_toggle.toggled.connect(
+            lambda expanded: self.filters_toggle.setText(
+                "⌄  FILTROS DE CONSULTA" if expanded else "›  FILTROS DE CONSULTA"
+            )
+        )
         side.addStretch()
 
         help_label = QLabel(
@@ -479,10 +500,10 @@ class MainWindow(QMainWindow):
         self.table.setWordWrap(False)
         self.table.setShowGrid(True)
         self.table.verticalHeader().setVisible(True)
-        self.table.verticalHeader().setDefaultSectionSize(27)
+        self.table.verticalHeader().setDefaultSectionSize(30)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.table.horizontalHeader().setDefaultSectionSize(125)
+        self.table.horizontalHeader().setDefaultSectionSize(140)
         self.table.horizontalHeader().setMinimumSectionSize(75)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.itemSelectionChanged.connect(self._update_properties)
@@ -532,8 +553,8 @@ class MainWindow(QMainWindow):
 
         properties = QFrame()
         properties.setObjectName("properties")
-        properties.setMinimumWidth(205)
-        properties.setMaximumWidth(255)
+        properties.setMinimumWidth(235)
+        properties.setMaximumWidth(310)
         props = QVBoxLayout(properties)
         props.setContentsMargins(12, 14, 12, 12)
         props.setSpacing(8)
@@ -560,7 +581,7 @@ class MainWindow(QMainWindow):
         body.setStretchFactor(0, 0)
         body.setStretchFactor(1, 1)
         body.setStretchFactor(2, 0)
-        body.setSizes([185, 850, 225])
+        body.setSizes([215, 900, 265])
         root.addWidget(body, 1)
 
         self.setCentralWidget(workspace)
@@ -998,61 +1019,3 @@ class MainWindow(QMainWindow):
             )
             self.summary_detail.setText(
                 "Sem filtros ativos. As estatísticas consideram todos os registros carregados."
-            )
-        else:
-            uncertain = sum(
-                bool(missing_criteria_fields(record, criteria))
-                for record in records
-            )
-            verified = result_count - uncertain
-            rejected = max(0, source_count - result_count)
-            self.summary_headline.setText(
-                f"{result_count} registros retornados de {source_count} registros da base."
-            )
-            self.summary_detail.setText(
-                f"Compatibilidade verificável: {verified}  |  "
-                f"Dados insuficientes: {uncertain}  |  "
-                f"Não retornados por divergência: {rejected}.\n"
-                "Registros incompletos permanecem disponíveis para conferência."
-            )
-        summaries = summarize_rates(records)
-        self.rate_table.setSortingEnabled(False)
-        self.rate_table.setRowCount(len(RATE_FIELDS))
-        for row, field in enumerate(RATE_FIELDS):
-            item = summaries[field]
-            count = item["count"]
-            coverage = (100 * count / result_count) if result_count else 0
-            values = [
-                RATE_LABELS.get(field, field), str(count),
-                f"{coverage:.1f}%".replace(".", ","),
-                _pt_number(item["mean"]), _pt_number(item["median"]),
-                _pt_number(item["minimum"]), _pt_number(item["maximum"]),
-            ]
-            for column, value in enumerate(values):
-                cell = QTableWidgetItem(value)
-                if column > 0:
-                    cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.rate_table.setItem(row, column, cell)
-        self.rate_table.setSortingEnabled(True)
-
-    def show_records(self, records, criteria=None):
-        self._show_summary(records, criteria)
-        self._records_by_id = {record.source_row: record for record in records}
-        columns = list(dict.fromkeys(
-            key for record in records for key in record.values
-        ))
-        self.table.setSortingEnabled(False)
-        self.table.clear()
-        self.table.setRowCount(len(records))
-        self.table.setColumnCount(len(columns))
-        self.table.setHorizontalHeaderLabels(columns)
-        for row_index, record in enumerate(records):
-            for column_index, key in enumerate(columns):
-                value = format_display_value(record.get(key))
-                cell = QTableWidgetItem(value)
-                if column_index == 0:
-                    cell.setData(Qt.ItemDataRole.UserRole, record.source_row)
-                self.table.setItem(row_index, column_index, cell)
-        self.table.setSortingEnabled(True)
-        self.grid_count.setText(f"{len(records)} registros")
-        self.clear_properties()
