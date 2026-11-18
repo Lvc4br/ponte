@@ -10,12 +10,13 @@ import json
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QKeySequence
+from PySide6.QtGui import QDesktopServices, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QApplication, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
     QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton,
     QSplitter, QTableWidget, QTableWidgetItem, QTreeWidget, QTreeWidgetItem,
     QVBoxLayout, QWidget, QComboBox, QTextEdit, QHeaderView, QAbstractItemView,
+    QScrollArea, QStackedWidget,
 )
 
 from app.documents.index import DocumentIndex
@@ -112,6 +113,8 @@ class SpreadsheetWindow(QMainWindow):
         self._sort_column = None
         self._sort_descending = False
         self._legacy_window = None
+        self._pdf_document = None
+        self._pdf_page_index = 0
         self._build()
         self._load_projects()
 
@@ -216,6 +219,14 @@ class SpreadsheetWindow(QMainWindow):
         doc_head = QHBoxLayout()
         doc_head.addWidget(QLabel("DOCUMENTOS DO PROJETO"))
         doc_head.addStretch()
+        self.pdf_previous = QPushButton("◀ Página")
+        self.pdf_previous.clicked.connect(self._pdf_previous)
+        self.pdf_next = QPushButton("Página ▶")
+        self.pdf_next.clicked.connect(self._pdf_next)
+        self.pdf_page_label = QLabel("")
+        doc_head.addWidget(self.pdf_previous)
+        doc_head.addWidget(self.pdf_page_label)
+        doc_head.addWidget(self.pdf_next)
         open_button = QPushButton("Abrir arquivo")
         open_button.clicked.connect(self._open_document)
         doc_head.addWidget(open_button)
@@ -230,8 +241,16 @@ class SpreadsheetWindow(QMainWindow):
         self.document_preview = QTextEdit()
         self.document_preview.setReadOnly(True)
         self.document_preview.setPlaceholderText("Selecione um documento para consultar o conteúdo extraído.")
+        self.pdf_preview = QLabel("Pré-visualização de PDF")
+        self.pdf_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.pdf_scroll = QScrollArea()
+        self.pdf_scroll.setWidgetResizable(True)
+        self.pdf_scroll.setWidget(self.pdf_preview)
+        self.preview_stack = QStackedWidget()
+        self.preview_stack.addWidget(self.document_preview)
+        self.preview_stack.addWidget(self.pdf_scroll)
         doc_body.addWidget(self.document_tree)
-        doc_body.addWidget(self.document_preview)
+        doc_body.addWidget(self.preview_stack)
         doc_body.setSizes([360, 900])
         doc_layout.addWidget(doc_body, 1)
         docs_split.addWidget(doc_panel)
@@ -711,6 +730,7 @@ class SpreadsheetWindow(QMainWindow):
         document = self.documents.get_document(document_id)
         if not document:
             return
+        self._close_pdf_preview()
         summary = {
             "arquivo": document["file_name"],
             "caminho": document["path"],
@@ -722,6 +742,63 @@ class SpreadsheetWindow(QMainWindow):
             "conteudo_extraido": document["sections"],
         }
         self.document_preview.setPlainText(json.dumps(summary, ensure_ascii=False, indent=2, default=str))
+        if document["extension"].casefold() == ".pdf" and Path(document["path"]).exists():
+            try:
+                import pypdfium2 as pdfium
+                self._pdf_document = pdfium.PdfDocument(document["path"])
+                self._pdf_page_index = 0
+                self._render_pdf_page()
+                self.preview_stack.setCurrentWidget(self.pdf_scroll)
+                return
+            except Exception as exc:
+                self.document_preview.setPlainText(
+                    f"Não foi possível pré-visualizar este PDF: {exc}\n\n"
+                    + json.dumps(summary, ensure_ascii=False, indent=2, default=str)
+                )
+        self.preview_stack.setCurrentWidget(self.document_preview)
+        self.pdf_page_label.setText("")
+
+    def _close_pdf_preview(self):
+        if self._pdf_document is not None:
+            try:
+                self._pdf_document.close()
+            except Exception:
+                pass
+        self._pdf_document = None
+        self._pdf_page_index = 0
+
+    def _render_pdf_page(self):
+        if self._pdf_document is None:
+            return
+        try:
+            from io import BytesIO
+            page = self._pdf_document[self._pdf_page_index]
+            bitmap = page.render(scale=1.35)
+            image = bitmap.to_pil()
+            buffer = BytesIO()
+            image.save(buffer, format="PNG")
+            pixmap = QPixmap()
+            if not pixmap.loadFromData(buffer.getvalue(), "PNG"):
+                raise ValueError("Não foi possível converter a página do PDF.")
+            self.pdf_preview.setPixmap(pixmap)
+            self.pdf_page_label.setText(
+                f"{self._pdf_page_index + 1} / {len(self._pdf_document)}"
+            )
+            self.pdf_previous.setEnabled(self._pdf_page_index > 0)
+            self.pdf_next.setEnabled(self._pdf_page_index + 1 < len(self._pdf_document))
+        except Exception as exc:
+            self.document_preview.setPlainText(f"Erro ao renderizar a página do PDF: {exc}")
+            self.preview_stack.setCurrentWidget(self.document_preview)
+
+    def _pdf_previous(self):
+        if self._pdf_document is not None and self._pdf_page_index > 0:
+            self._pdf_page_index -= 1
+            self._render_pdf_page()
+
+    def _pdf_next(self):
+        if self._pdf_document is not None and self._pdf_page_index + 1 < len(self._pdf_document):
+            self._pdf_page_index += 1
+            self._render_pdf_page()
 
     def _link_document(self):
         if self.project_id is None:
