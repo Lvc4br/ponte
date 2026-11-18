@@ -1,11 +1,11 @@
 from pathlib import Path
 import hashlib
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QFileDialog, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QHeaderView,
     QInputDialog, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox,
-    QPushButton, QSplitter, QTabBar, QTabWidget, QTableWidget, QTableWidgetItem,
+    QPushButton, QProgressDialog, QSplitter, QTabBar, QTabWidget, QTableWidget, QTableWidgetItem,
     QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -16,6 +16,8 @@ from app.core.validation import format_display_value, parse_input_number
 from app.data.excel_importer import read_excel
 from app.data.repository import SQLRepository
 from app.services.search_service import SearchService
+from app.documents.scanner import DocumentScanner
+from app.ui.document_scan_dialog import DocumentScanDialog
 
 
 RATE_LABELS = {
@@ -97,10 +99,22 @@ def _pt_number(value):
     return f"{value:,.3f}".replace(",", "_").replace(".", ",").replace("_", ".")
 
 
+class DocumentScanWorker(QThread):
+    completed = Signal(object)
+
+    def __init__(self, paths, parent=None):
+        super().__init__(parent)
+        self.paths = paths
+
+    def run(self):
+        results = DocumentScanner().scan_many(self.paths)
+        self.completed.emit(results)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Gestão de Obras | Workspace")
+        self.setWindowTitle("PONTE | Gerenciador Universal de Dados e Documentos")
         self.resize(1540, 920)
         self.setMinimumSize(1120, 700)
         self.repo = SQLRepository()
@@ -122,13 +136,13 @@ class MainWindow(QMainWindow):
         topbar.setObjectName("topbar")
         top = QHBoxLayout(topbar)
         top.setContentsMargins(14, 8, 14, 8)
-        brand = QLabel("OBRAS")
+        brand = QLabel("PONTE")
         brand.setObjectName("brand")
         top.addWidget(brand)
         divider = QLabel("/")
         divider.setObjectName("muted")
         top.addWidget(divider)
-        subtitle = QLabel("WORKSPACE  ·  DADOS DE ENGENHARIA")
+        subtitle = QLabel("GERENCIADOR UNIVERSAL  ·  DADOS E DOCUMENTOS")
         subtitle.setObjectName("muted")
         top.addWidget(subtitle)
         top.addStretch()
@@ -142,7 +156,8 @@ class MainWindow(QMainWindow):
         self.actions_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         actions_menu = QMenu(self.actions_button)
         actions_menu.addAction("Recarregar fonte SQL", self.load_sql)
-        actions_menu.addAction("Importar planilha Excel", self.import_excel)
+        actions_menu.addAction("Importar planilha Excel (base legada)", self.import_excel)
+        actions_menu.addAction("Analisar documentos...", self.scan_documents)
         actions_menu.addSeparator()
         actions_menu.addAction("Excluir registros selecionados", self.delete_selected)
         self.actions_button.setMenu(actions_menu)
@@ -239,11 +254,14 @@ class MainWindow(QMainWindow):
         self.import_button = QPushButton("＋  Importar Excel")
         self.import_button.setObjectName("primary")
         self.import_button.clicked.connect(self.import_excel)
+        self.scan_button = QPushButton("⌕  Analisar documentos")
+        self.scan_button.clicked.connect(self.scan_documents)
         self.reload_button = QPushButton("↻  Atualizar")
         self.reload_button.clicked.connect(self.load_sql)
         self.delete_button = QPushButton("Excluir selecionados")
         self.delete_button.clicked.connect(self.delete_selected)
         page_header.addWidget(self.import_button)
+        page_header.addWidget(self.scan_button)
         page_header.addWidget(self.reload_button)
         page_header.addWidget(self.delete_button)
         center_layout.addLayout(page_header)
@@ -489,6 +507,37 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self, "Não foi possível carregar a base SQL", str(exc)
             )
+
+    def scan_documents(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Selecionar documentos para análise",
+            "",
+            "Documentos suportados (*.pdf *.docx *.xlsx *.xlsm *.xls *.pptx *.csv *.txt *.md *.json *.xml *.dxf *.ifc *.png *.jpg *.jpeg *.tif *.tiff *.bmp);;Todos os arquivos (*.*)",
+        )
+        if not paths:
+            return
+        self.scan_progress = QProgressDialog(
+            "Analisando documentos localmente. Arquivos grandes podem levar algum tempo...",
+            None, 0, 0, self,
+        )
+        self.scan_progress.setWindowTitle("Análise documental")
+        self.scan_progress.setWindowModality(Qt.WindowModality.WindowModal)
+        self.scan_progress.setMinimumDuration(0)
+        self.scan_progress.setCancelButton(None)
+        self.scan_progress.show()
+        self.scan_worker = DocumentScanWorker(paths, self)
+        self.scan_worker.completed.connect(self._show_document_scan_results)
+        self.scan_worker.start()
+
+    def _show_document_scan_results(self, results):
+        self.scan_progress.close()
+        self.last_document_scan_results = results
+        dialog = DocumentScanDialog(results, self)
+        dialog.exec()
+        self.statusBar().showMessage(
+            f"Análise documental concluída: {len(results)} arquivo(s) processado(s)."
+        )
 
     def import_excel(self):
         path, _ = QFileDialog.getOpenFileName(
