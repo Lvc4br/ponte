@@ -400,7 +400,8 @@ class MainWindow(QMainWindow):
         for key, (file_name, sheet_name) in sorted(imported.items(), key=lambda item: item[1]):
             entries.append((key, f"{Path(file_name).stem} · {sheet_name}"))
         self.dataset_tabs.blockSignals(True)
-        self.dataset_tabs.clear()
+        while self.dataset_tabs.count():
+            self.dataset_tabs.removeTab(0)
         selected_index = 0
         for index, (key, label) in enumerate(entries):
             self.dataset_tabs.addTab(label)
