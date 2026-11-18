@@ -47,7 +47,8 @@ class WorkspaceDialog(QDialog):
         self.tables = QComboBox()
         self.tables.currentIndexChanged.connect(self._table_changed)
         table_row.addWidget(self.tables, 1)
-        for label, callback in (
+        action_row = QHBoxLayout()
+        actions = (
             ("Nova tabela", self._add_table),
             ("Renomear tabela", self._rename_table),
             ("Excluir tabela", self._delete_table),
@@ -62,11 +63,13 @@ class WorkspaceDialog(QDialog):
             ("Exportar Excel", self._export_xlsx),
             ("Vincular documento", self._link_document),
             ("Documentos do projeto", self._show_project_documents),
-        ):
+        )
+        for index, (label, callback) in enumerate(actions):
             button = QPushButton(label)
             button.clicked.connect(callback)
-            table_row.addWidget(button)
+            (table_row if index < 4 else action_row).addWidget(button)
         root.addLayout(table_row)
+        root.addLayout(action_row)
 
         self.grid = QTableWidget()
         self.grid.setAlternatingRowColors(True)
