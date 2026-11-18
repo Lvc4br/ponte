@@ -54,6 +54,18 @@ class DocumentScanner:
         ".ifc", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp",
     }
 
+    def scan_many(self, paths: list[str | Path]) -> list[DocumentScanResult]:
+        """Scan files and directory contents; isolate errors per file."""
+        candidates: list[Path] = []
+        for item in paths:
+            path = Path(item).expanduser()
+            if path.is_dir():
+                candidates.extend(child for child in path.rglob("*") if child.is_file())
+            elif path.is_file():
+                candidates.append(path)
+        unique = sorted({item.resolve() for item in candidates}, key=lambda item: str(item).casefold())
+        return [self.scan(item) for item in unique]
+
     def scan(self, file_path: str | Path) -> DocumentScanResult:
         path = Path(file_path).expanduser().resolve()
         if not path.is_file():
