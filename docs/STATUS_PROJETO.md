@@ -1,44 +1,51 @@
 # Situação do projeto
 
 **Produto:** PONTE — Gerenciador Universal de Dados e Documentos  
-**Objetivo:** gerenciar dados e documentos de projetos de diferentes áreas, localmente e sem dependência operacional do Excel.  
-**Branch:** main
+**Branch:** main  
+**Escopo:** gerenciador local-first para projetos de qualquer área; pontes/obras são um conjunto legado.
 
-## Implementado nesta etapa na branch main
+## Implementado no código
 
-- [x] Pacote inicial de scanner documental em `app/documents`.
-- [x] SHA-256 calculado em fluxo, metadados básicos, tamanho e tipo MIME.
-- [x] Resultado padronizado com seções, avisos, erros e estado por arquivo.
-- [x] Leitura inicial de PDF textual, DOCX, XLSX/XLSM, XLS, PPTX, CSV, TXT, MD, JSON e XML.
-- [x] Adaptadores opcionais para imagens/OCR, DXF e IFC.
-- [x] Limite inicial de 512 MiB por arquivo.
-- [x] Testes iniciais para TXT, CSV, JSON, extensão não suportada e arquivo inexistente.
-- [x] Documentação de arquitetura e limitações.
-- [x] Preservação do conjunto de dados de pontes existente; nenhuma migração destrutiva foi feita nesta etapa.
+- [x] Workspace genérico com projetos, tabelas, colunas e registros.
+- [x] Tipos texto, inteiro, decimal, booleano, data, data/hora e JSON.
+- [x] CRUD de projetos, tabelas, colunas e registros no backend.
+- [x] Validação de tipos, campos obrigatórios, padrões e nomes únicos.
+- [x] Filtros, ordenação e paginação no backend.
+- [x] Relacionamentos entre colunas de tabelas do mesmo projeto.
+- [x] Fórmulas seguras por AST, com colunas calculadas e referências entre colunas.
+- [x] Interface inicial para projetos, tabelas, edição de células e colunas calculadas.
+- [x] Importação/exportação inicial de CSV e XLSX/XLSM.
+- [x] Migração aditiva do workspace SQLite v1 para v2.
+- [x] Associação de documentos do catálogo a projetos no backend.
+- [x] Scanner recursivo, catálogo documental e biblioteca integrada à interface.
+- [x] Leitores iniciais de PDF, DOC/DOCX, PPT/PPTX, RTF, ODT/ODP, XLS/XLSX/XLSM/XLSB, CSV/TXT/MD/JSON/XML, imagens, DXF, DWG opcional, IFC opcional e reconhecimento RVT/RFA.
+- [x] Proteção inicial contra arquivos Office compactados suspeitos.
+- [x] Testes automatizados adicionados para workspace, fórmulas, importação/exportação, scanner e catálogo.
 
-## Ainda não implementado
+## Ainda precisa ser verificado
 
-- [ ] Executar CI atualizado e corrigir falhas encontradas.
-- [x] Scanner integrado à interface gráfica.
-- [x] Processamento de múltiplos arquivos e varredura recursiva de pastas pela interface.
-- [ ] Progresso detalhado por arquivo e cancelamento seguro de uma varredura em andamento.
-- [ ] OCR de PDF digitalizado com posição e confiança por trecho (a extração textual OCR inicial existe, coordenadas/confiança ainda pendentes).
-- [ ] Extração aprofundada de gráficos, imagens, cotas, blocos CAD e geometria BIM.
-- [ ] Leitura direta de DWG e RVT ou conversão confiável desses formatos.
-- [ ] Evoluir o catálogo documental para suportar projetos, versões, reanálise seletiva e histórico de alterações.
-- [ ] Modelo universal de projetos, tabelas, colunas e registros.
-- [ ] Motor tabular genérico e interface desvinculada do domínio de obras.
-- [ ] Revisão humana das extrações e conversão para registros.
-- [ ] Backup/restauração e build Windows validados com os novos componentes.
+- [ ] Resultado real do GitHub Actions após os últimos commits.
+- [ ] Build Windows e smoke test do executável.
+- [ ] Compatibilidade do PyInstaller com todos os leitores e plugins Qt.
+- [ ] Execução em Windows limpo sem Python instalado.
+- [ ] Backup/restauração do banco completo e validação de integridade.
+- [ ] Testes com arquivos reais de DOC/DOCX/PDF/XLS/XLSX/PPT/PPTX/DWG/IFC/RVT autorizados.
+- [ ] OCR com Tesseract e idiomas português/inglês.
+- [ ] Conversão DOC/PPT/RTF/ODT/ODP com LibreOffice.
+- [ ] Conversão DWG com ODA File Converter.
+- [ ] Leitura IFC com IfcOpenShell.
+- [ ] Progresso por arquivo, cancelamento seguro e relatório exportável.
+- [ ] UX de edição em lote, copiar/colar, desfazer/refazer e filtros visuais.
+- [ ] Revisão de segurança, desempenho, acessibilidade e usabilidade.
+- [ ] Testes de usuário antes de considerar substituição de planilhas complexas.
 
 ## Limitações conhecidas
 
-A extração atual não equivale a leitura semântica completa de qualquer documento. PDFs digitalizados precisam de OCR; recursos avançados de Office podem exigir adaptadores específicos; OCR depende do Tesseract instalado; IFC depende de IfcOpenShell; DWG/RVT não estão diretamente suportados nesta etapa. Nenhuma saída deve ser considerada validação técnica automática.
+Não existe leitura integral de qualquer formato. RVT/RFA não têm leitor direto. DWG depende de conversor externo. OCR, LibreOffice e IfcOpenShell dependem de instalações adicionais. Office avançado, geometria CAD/BIM, macros, objetos incorporados e funções avançadas do Excel não são integralmente suportados.
 
-## Preservação e segurança
+## Preservação
 
 - Não publicar SQL real, bancos locais, planilhas internas, documentos corporativos ou credenciais.
-- Preservar a base de pontes durante a migração.
-- Manter os arquivos originais sem alteração.
-- Não executar macros ou conteúdo ativo de documentos.
-- Validar compatibilidade e empacotamento antes de distribuir novo executável.
+- A migração genérica usa tabelas novas e não deve apagar registros legados.
+- Fazer backup de `data/registros.sqlite3` antes da atualização do PC.
+- Não atualizar o PC até o CI e o pacote Windows serem verificados.
