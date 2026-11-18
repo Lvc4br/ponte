@@ -13,6 +13,7 @@ import mimetypes
 import shutil
 import subprocess
 import tempfile
+import zipfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -50,6 +51,8 @@ class DocumentScanner:
     """Inspect supported office, text, PDF, image and technical file formats."""
 
     MAX_FILE_SIZE = 512 * 1024 * 1024
+    MAX_ARCHIVE_UNCOMPRESSED = 1024 * 1024 * 1024
+    MAX_ARCHIVE_ENTRIES = 20000
     SUPPORTED = {
         ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".rtf", ".odt", ".odp",
         ".xlsx", ".xlsm", ".xls", ".xlsb", ".csv", ".txt", ".md", ".json",
@@ -74,7 +77,8 @@ class DocumentScanner:
             except Exception as exc:
                 results.append(DocumentScanResult(
                     path=str(item), file_name=item.name, extension=item.suffix.lower(),
-                    mime_type=mimetypes.guess_type(item.name)[0], size_bytes=0,
+                    mime_type=mimetypes.guess_type(item.name)[0],
+                    size_bytes=item.stat().st_size if item.exists() else 0,
                     sha256="", status="error",
                     errors=[f"{type(exc).__name__}: {exc}"],
                 ))
@@ -109,6 +113,8 @@ class DocumentScanner:
             return result
 
         try:
+            if extension in {'.docx', '.xlsx', '.xlsm', '.pptx', '.odt', '.odp'}:
+                self._validate_archive(path)
             handler = {
                 ".pdf": self._pdf,
                 ".doc": self._office_text,
@@ -152,6 +158,21 @@ class DocumentScanner:
             result.status = "error"
             result.errors.append(f"{type(exc).__name__}: {exc}")
         return result
+
+    @staticmethod
+    def _validate_archive(path: Path) -> None:
+        """Reject suspiciously large Office/OpenDocument ZIP containers."""
+        with zipfile.ZipFile(path) as archive:
+            entries = archive.infolist()
+            if len(entries) > DocumentScanner.MAX_ARCHIVE_ENTRIES:
+                raise ValueError("Documento compactado contém entradas demais.")
+            expanded = sum(item.file_size for item in entries)
+            if expanded > DocumentScanner.MAX_ARCHIVE_UNCOMPRESSED:
+                raise ValueError("Conteúdo descompactado excede o limite de segurança de 1 GiB.")
+            for item in entries:
+                if item.file_size > 1024 * 1024 and item.compress_size:
+                    if item.file_size / item.compress_size > 200:
+                        raise ValueError("Taxa de compressão suspeita; arquivo recusado por segurança.")
 
     @staticmethod
     def _pdf(path: Path, result: DocumentScanResult) -> None:
