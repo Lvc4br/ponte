@@ -14,10 +14,11 @@ from typing import Any
 
 from app.data.dataset_store import DEFAULT_STORE
 from app.workspace.models import SUPPORTED_COLUMN_TYPES
+from app.workspace.formulas import FormulaEngine, FormulaError
 
 
 class WorkspaceStore:
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def __init__(self, path: str | Path = DEFAULT_STORE):
         self.path = Path(path)
@@ -63,6 +64,7 @@ class WorkspaceStore:
                     data_type TEXT NOT NULL,
                     required INTEGER NOT NULL DEFAULT 0,
                     default_json TEXT,
+                    formula TEXT,
                     position INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(table_id, name)
@@ -104,8 +106,16 @@ class WorkspaceStore:
                 )
             elif row["version"] > self.SCHEMA_VERSION:
                 raise RuntimeError("O banco foi criado por uma versão mais recente do PONTE.")
-            elif row["version"] < self.SCHEMA_VERSION:
-                raise RuntimeError("Migração de workspace necessária; versão não suportada.")
+            elif row["version"] < 2:
+                column_names = {
+                    item["name"] for item in db.execute("PRAGMA table_info(workspace_columns)")
+                }
+                if "formula" not in column_names:
+                    db.execute("ALTER TABLE workspace_columns ADD COLUMN formula TEXT")
+                db.execute(
+                    "UPDATE ponte_schema_version SET version=? WHERE component='workspace'",
+                    (self.SCHEMA_VERSION,),
+                )
 
     @staticmethod
     def _name(value: str, label: str) -> str:
@@ -227,13 +237,32 @@ class WorkspaceStore:
             return cursor.rowcount == 1
 
     def add_column(self, table_id: int, name: str, data_type="text", *,
-                   required=False, default=None, position=None) -> int:
+                   required=False, default=None, position=None, formula=None) -> int:
         name = self._name(name, "Nome da coluna")
         if data_type not in SUPPORTED_COLUMN_TYPES:
             raise ValueError(f"Tipo de coluna não suportado: {data_type}")
-        if default is not None:
+        if formula is not None:
+            if required or default is not None:
+                raise ValueError("Coluna calculada não aceita obrigatoriedade nem valor padrão.")
+            if not isinstance(formula, str) or not formula.strip():
+                raise ValueError("Fórmula vazia.")
+        elif default is not None:
             self._validate_value(name, data_type, default, bool(required))
         with self._connect() as db:
+            if formula is not None:
+                existing = {
+                    row["name"] for row in db.execute(
+                        "SELECT name FROM workspace_columns WHERE table_id=?", (int(table_id),)
+                    )
+                }
+                dependencies = FormulaEngine().dependencies(formula)
+                missing = dependencies - existing
+                if missing:
+                    raise ValueError("A fórmula referencia colunas inexistentes: " + ", ".join(sorted(missing)))
+                try:
+                    FormulaEngine().evaluate(formula, {key: 2 for key in dependencies})
+                except Exception as exc:
+                    raise ValueError(f"Fórmula inválida: {exc}") from exc
             if position is None:
                 position = db.execute(
                     "SELECT COALESCE(MAX(position)+1, 0) FROM workspace_columns WHERE table_id=?",
@@ -241,10 +270,10 @@ class WorkspaceStore:
                 ).fetchone()[0]
             cursor = db.execute(
                 """INSERT INTO workspace_columns
-                   (table_id, name, data_type, required, default_json, position)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
+                   (table_id, name, data_type, required, default_json, formula, position)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (int(table_id), name, data_type, int(bool(required)),
-                 None if default is None else self._json(default), int(position)),
+                 None if default is None else self._json(default), formula, int(position)),
             )
             return cursor.lastrowid
 
@@ -257,7 +286,8 @@ class WorkspaceStore:
         return [{
             "id": r["id"], "table_id": r["table_id"], "name": r["name"],
             "data_type": r["data_type"], "required": bool(r["required"]),
-            "default": self._decode(r["default_json"]), "position": r["position"],
+            "default": self._decode(r["default_json"]), "formula": r["formula"],
+            "position": r["position"],
         } for r in rows]
 
     def rename_column(self, column_id: int, name: str) -> bool:
@@ -269,6 +299,15 @@ class WorkspaceStore:
             if column is None:
                 return False
             old_name = column["name"]
+            dependent_formulas = db.execute(
+                "SELECT name, formula FROM workspace_columns WHERE table_id=? AND formula IS NOT NULL",
+                (column["table_id"],),
+            ).fetchall()
+            for dependent in dependent_formulas:
+                if old_name in FormulaEngine().dependencies(dependent["formula"]):
+                    raise ValueError(
+                        f"A coluna '{old_name}' é usada pela fórmula '{dependent['name']}'."
+                    )
             records = db.execute(
                 "SELECT id, values_json FROM workspace_records WHERE table_id=?",
                 (column["table_id"],),
@@ -295,6 +334,14 @@ class WorkspaceStore:
             if row is None:
                 return False
             table_id, name = row["table_id"], row["name"]
+            for dependent in db.execute(
+                "SELECT name, formula FROM workspace_columns WHERE table_id=? AND formula IS NOT NULL",
+                (table_id,),
+            ).fetchall():
+                if name in FormulaEngine().dependencies(dependent["formula"]):
+                    raise ValueError(
+                        f"A coluna '{name}' é usada pela fórmula '{dependent['name']}' e não pode ser removida."
+                    )
             records = db.execute(
                 "SELECT id, values_json FROM workspace_records WHERE table_id=?", (table_id,)
             ).fetchall()
@@ -326,8 +373,14 @@ class WorkspaceStore:
         unknown = set(values) - set(schema)
         if unknown:
             raise ValueError("Colunas desconhecidas: " + ", ".join(sorted(unknown)))
+        calculated = {name for name, column in schema.items() if column["formula"]}
+        supplied_calculated = set(values) & calculated
+        if supplied_calculated:
+            raise ValueError("Colunas calculadas não podem ser editadas: " + ", ".join(sorted(supplied_calculated)))
         normalized = {}
         for name, column in schema.items():
+            if column["formula"]:
+                continue
             if name in values:
                 value = values[name]
             elif partial:
@@ -390,6 +443,29 @@ class WorkspaceStore:
                 "values": self._decode(r["values_json"], {}),
                 "created_at": r["created_at"], "updated_at": r["updated_at"],
             } for r in rows]
+            formula_columns = [column for column in columns if column["formula"]]
+        engine = FormulaEngine()
+        for record in records:
+            resolved, resolving = {}, set()
+            def resolve(name):
+                if name in resolved:
+                    return resolved[name]
+                if name in resolving:
+                    raise FormulaError(f"Dependência circular de fórmula: {name}")
+                formula_column = next((c for c in formula_columns if c["name"] == name), None)
+                if formula_column is None:
+                    return record["values"].get(name)
+                resolving.add(name)
+                context = {
+                    dependency: resolve(dependency)
+                    for dependency in engine.dependencies(formula_column["formula"])
+                }
+                value = engine.evaluate(formula_column["formula"], context)
+                resolving.remove(name)
+                resolved[name] = value
+                return value
+            for column in formula_columns:
+                record["values"][column["name"]] = resolve(column["name"])
         for key, expected in filters.items():
             if isinstance(expected, dict):
                 op, target = next(iter(expected.items()))
