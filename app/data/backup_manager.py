@@ -160,17 +160,13 @@ class DatabaseBackupManager:
                 target_db.close()
                 backup_db.close()
             self.inspect(temp_path)
-            if self.database_path.exists():
-                active = sqlite3.connect(self.database_path)
-                try:
-                    active.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                finally:
-                    active.close()
-                for suffix in ("-wal", "-shm"):
-                    sidecar = Path(str(self.database_path) + suffix)
-                    if sidecar.exists():
-                        sidecar.unlink()
-            os.replace(temp_path, self.database_path)
+            restored_source = sqlite3.connect(temp_path)
+            active_target = sqlite3.connect(self.database_path)
+            try:
+                restored_source.backup(active_target)
+            finally:
+                active_target.close()
+                restored_source.close()
             restored = self.inspect(self.database_path)
             return {"restored": str(self.database_path), "safety_backup": safety, **restored}
         finally:
