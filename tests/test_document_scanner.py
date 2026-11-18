@@ -143,3 +143,17 @@ def test_scans_directory_recursively_in_batch(tmp_path):
 
     assert [result.file_name for result in results] == ["a.txt", "b.csv"]
     assert all(result.status == "success" for result in results)
+
+
+def test_invalid_pdf_is_reported_as_error_without_stopping_batch(tmp_path):
+    folder = tmp_path / "lote"
+    folder.mkdir()
+    (folder / "a.txt").write_text("válido", encoding="utf-8")
+    (folder / "b.pdf").write_bytes(b"arquivo PDF inválido")
+
+    results = DocumentScanner().scan_many([folder])
+
+    assert len(results) == 2
+    assert results[0].status == "success"
+    assert results[1].status == "error"
+    assert results[1].errors
