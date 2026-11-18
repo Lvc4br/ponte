@@ -12,7 +12,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
-    QApplication, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
+    QApplication, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog, QDialog, QDialogButtonBox,
     QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton,
     QSplitter, QTableWidget, QTableWidgetItem, QTreeWidget, QTreeWidgetItem,
     QVBoxLayout, QWidget, QComboBox, QTextEdit, QHeaderView, QAbstractItemView,
@@ -529,25 +529,50 @@ class SpreadsheetWindow(QMainWindow):
         if self.table_id is None or not self.columns:
             QMessageBox.information(self, "Registro", "Crie uma tabela com ao menos uma coluna.")
             return
-        values = {}
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Novo registro")
+        dialog.setMinimumWidth(520)
+        form = QFormLayout(dialog)
+        editors = {}
         for column in self.columns:
             if column.get("formula"):
                 continue
-            raw, ok = QInputDialog.getText(
-                self, "Novo registro", f"{column['name']} ({column['data_type']}):"
+            editor = QLineEdit()
+            editor.setPlaceholderText(
+                f"{column['data_type']}" + (" · obrigatório" if column["required"] else " · opcional")
             )
-            if not ok:
-                return
-            try:
-                values[column["name"]] = self._parse_value(raw, column["data_type"])
-            except Exception as exc:
-                QMessageBox.warning(self, "Valor inválido", f"{column['name']}: {exc}")
-                return
+            form.addRow(column["name"], editor)
+            editors[column["name"]] = (editor, column)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.button(QDialogButtonBox.StandardButton.Save).setText("Salvar registro")
+        buttons.accepted.connect(lambda: self._submit_new_record(dialog, editors))
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        dialog.exec()
+
+    def _submit_new_record(self, dialog, editors):
+        values = {}
         try:
+            for name, (editor, column) in editors.items():
+                raw = editor.text().strip()
+                if not raw:
+                    if column["required"]:
+                        raise ValueError(f"O campo “{name}” é obrigatório.")
+                    if column["default"] is not None:
+                        continue
+                    values[name] = None
+                else:
+                    values[name] = self._parse_value(raw, column["data_type"])
             self.store.insert_record(self.table_id, values)
+            dialog.accept()
             self._refresh_grid()
+            self.status.setText("Novo registro salvo.")
         except Exception as exc:
-            QMessageBox.warning(self, "Registro", str(exc))
+            QMessageBox.warning(dialog, "Não foi possível salvar", str(exc))
 
     def _delete_selected(self):
         rows = sorted({index.row() for index in self.grid.selectionModel().selectedIndexes()})
