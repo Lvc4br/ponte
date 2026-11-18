@@ -34,6 +34,15 @@ jobs:
         run: python -m compileall -q app tests main.py
       - name: Executar testes
         run: python -m pytest -v
+      - name: Instalar OCR para o pacote Windows
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          choco install tesseract --yes --no-progress
+          $tessdata = "C:\Program Files\Tesseract-OCR\tessdata"
+          if (Test-Path $tessdata) {
+            Invoke-WebRequest "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/por.traineddata" -OutFile "$tessdata\por.traineddata"
+          }
       - name: Gerar executável
         shell: cmd
         run: build\build_windows.bat
