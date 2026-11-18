@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFileDialog, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QHeaderView,
     QInputDialog, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox,
-    QPushButton, QSplitter, QTabWidget, QTableWidget, QTableWidgetItem,
+    QPushButton, QSplitter, QTabBar, QTabWidget, QTableWidget, QTableWidgetItem,
     QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -54,7 +54,12 @@ QTabBar::tab {
     background: #2c3138; color: #aeb5bf; padding: 9px 16px;
     border: 1px solid #3a414b; border-bottom: 0; margin-right: 2px;
 }
-QTabBar::tab:selected { background: #25292f; color: #f2ae5b; }
+QTabBar::tab:selected { background: #25292f; color: #f2ae5b; border-top: 2px solid #e49a43; }
+QTabBar#datasetTabs { background: #25292f; }
+QTabBar#datasetTabs::tab { padding: 8px 14px; min-width: 90px; }
+QTabBar#datasetTabs::tab:selected { background: #343a43; }
+QTableWidget::item { padding: 3px 5px; }
+QTableWidget::item:selected { background: #59432f; }
 QTableWidget {
     background: #22262c; alternate-background-color: #292e35;
     color: #e1e5e9; gridline-color: #3b424c;
@@ -102,6 +107,7 @@ class MainWindow(QMainWindow):
         self.service = SearchService()
         self.results = []
         self._records_by_id = {}
+        self._active_dataset = '__all__'
         self._build()
         self.load_sql()
 
@@ -259,6 +265,14 @@ class MainWindow(QMainWindow):
         grid_toolbar.addWidget(self.grid_count)
         data_layout.addLayout(grid_toolbar)
 
+        self.dataset_tabs = QTabBar()
+        self.dataset_tabs.setObjectName("datasetTabs")
+        self.dataset_tabs.setExpanding(False)
+        self.dataset_tabs.setMovable(False)
+        self.dataset_tabs.setUsesScrollButtons(True)
+        self.dataset_tabs.currentChanged.connect(self._on_dataset_changed)
+        data_layout.addWidget(self.dataset_tabs)
+
         self.table = QTableWidget()
         self.table.setObjectName("recordsGrid")
         self.table.setAlternatingRowColors(True)
@@ -361,6 +375,55 @@ class MainWindow(QMainWindow):
     def _switch_tab(self, index):
         self.tabs.setCurrentIndex(index)
 
+    def _dataset_key(self, record):
+        if not record.source_file:
+            return "__base__"
+        return f"{record.source_file}::{record.source_sheet or 'Planilha'}"
+
+    def _dataset_records(self, key):
+        if key == "__all__":
+            return list(self.repo.records)
+        if key == "__base__":
+            return [record for record in self.repo.records if not record.source_file]
+        return [record for record in self.repo.records if self._dataset_key(record) == key]
+
+    def _refresh_dataset_navigation(self, selected_key=None):
+        selected_key = selected_key or self._active_dataset
+        entries = [("__all__", "Todas")]
+        if any(not record.source_file for record in self.repo.records):
+            entries.append(("__base__", "Base principal"))
+        imported = {}
+        for record in self.repo.records:
+            if record.source_file:
+                key = self._dataset_key(record)
+                imported[key] = (record.source_file, record.source_sheet or "Planilha")
+        for key, (file_name, sheet_name) in sorted(imported.items(), key=lambda item: item[1]):
+            entries.append((key, f"{Path(file_name).stem} · {sheet_name}"))
+        self.dataset_tabs.blockSignals(True)
+        self.dataset_tabs.clear()
+        selected_index = 0
+        for index, (key, label) in enumerate(entries):
+            self.dataset_tabs.addTab(label)
+            self.dataset_tabs.setTabData(index, key)
+            if key == selected_key:
+                selected_index = index
+        self.dataset_tabs.setCurrentIndex(selected_index)
+        self.dataset_tabs.blockSignals(False)
+        self._active_dataset = entries[selected_index][0]
+        self.dataset_tabs.setToolTip("Navegue entre a base principal e cada planilha importada.")
+
+    def _on_dataset_changed(self, index):
+        if index < 0:
+            return
+        key = self.dataset_tabs.tabData(index)
+        if not key:
+            return
+        self._active_dataset = key
+        records = self._dataset_records(key)
+        self.results = records
+        self.show_records(records)
+        self.statusBar().showMessage(f"{self.dataset_tabs.tabText(index)}  |  {len(records)} registros")
+
     def _on_tab_changed(self, index):
         self.nav_data.setChecked(index == 0)
         self.nav_indicators.setChecked(index == 1)
@@ -406,7 +469,8 @@ class MainWindow(QMainWindow):
         try:
             records = self.repo.load()
             self.results = records
-            self.show_records(records)
+            self._refresh_dataset_navigation("__all__")
+            self.show_records(self._dataset_records(self._active_dataset))
             source_label = (
                 Path(self.repo.source).name if self.repo.source
                 else "Base local salva"
@@ -417,7 +481,8 @@ class MainWindow(QMainWindow):
             )
         except Exception as exc:
             self.results = self.repo.records
-            self.show_records(self.results)
+            self._refresh_dataset_navigation("__all__")
+            self.show_records(self._dataset_records(self._active_dataset))
             self.workspace_status.setText("BASE LOCAL  ·  ATENÇÃO")
             self.statusBar().showMessage("Não foi possível carregar a fonte SQL")
             QMessageBox.warning(
@@ -479,9 +544,10 @@ class MainWindow(QMainWindow):
             )
             if answer != QMessageBox.StandardButton.Yes:
                 return
-            count = self.repo.add_excel_records(incoming, file_hash, file_name)
+            count = self.repo.add_excel_records(incoming, file_hash, file_name, sheet)
             self.results = self.repo.records
-            self.show_records(self.results)
+            self._refresh_dataset_navigation(f"{file_name}::{sheet}")
+            self.show_records(self._dataset_records(self._active_dataset))
             self.statusBar().showMessage(
                 f"{count} registros adicionados  |  {len(self.repo.records)} ativos"
             )
@@ -529,7 +595,8 @@ class MainWindow(QMainWindow):
             self.repo.store.backup()
             deleted = self.repo.delete_records(ids)
             self.results = self.repo.records
-            self.show_records(self.results)
+            self._refresh_dataset_navigation(self._active_dataset)
+            self.show_records(self._dataset_records(self._active_dataset))
             self.statusBar().showMessage(
                 f"{deleted} registros excluídos  |  {len(self.repo.records)} ativos"
             )
@@ -561,7 +628,8 @@ class MainWindow(QMainWindow):
         return SearchCriteria(**data, type_obra=type_value)
 
     def search(self):
-        if not self.repo.records:
+        active_records = self._dataset_records(self._active_dataset)
+        if not active_records:
             QMessageBox.information(
                 self, "Base necessária",
                 "Coloque database/ponte.sql na pasta do aplicativo e cadastre os dados autorizados."
@@ -569,7 +637,7 @@ class MainWindow(QMainWindow):
             return
         try:
             criteria = self.criteria()
-            self.results = self.service.search(self.repo.records, criteria)
+            self.results = self.service.search(active_records, criteria)
             self.show_records(self.results, criteria)
             self.statusBar().showMessage(
                 f"{len(self.results)} de {len(self.repo.records)} registros correspondem aos filtros"
@@ -588,12 +656,12 @@ class MainWindow(QMainWindow):
         for low, high in self.fields.values():
             low.clear()
             high.clear()
-        self.results = self.repo.records
+        self.results = self._dataset_records(self._active_dataset)
         self.show_records(self.results)
         self.statusBar().showMessage(f"{len(self.results)} registros carregados")
 
     def _show_summary(self, records, criteria=None):
-        source_count = len(self.repo.records)
+        source_count = len(self._dataset_records(self._active_dataset))
         result_count = len(records)
         if criteria is None:
             self.summary_headline.setText(
