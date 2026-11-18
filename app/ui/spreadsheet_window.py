@@ -334,7 +334,7 @@ class SpreadsheetWindow(QMainWindow):
                     value = record["values"].get(column["name"])
                     item = QTableWidgetItem("" if value is None else str(value))
                     item.setData(Qt.ItemDataRole.UserRole, column["name"])
-                    item.setData(Qt.ItemDataRole.UserRole + 1, item.text())
+                    item.setData(Qt.ItemDataRole.UserRole + 1, value)
                     if column.get("formula"):
                         item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                         item.setToolTip(f"Coluna calculada · {column['formula']}")
@@ -449,11 +449,11 @@ class SpreadsheetWindow(QMainWindow):
             value = self._parse_value(item.text(), column["data_type"])
             previous = item.data(Qt.ItemDataRole.UserRole + 1)
             self.store.update_record(record_id, {column["name"]: value})
-            if str(previous) != item.text():
-                old_value = self._parse_value(str(previous), column["data_type"]) if previous != "" else None
+            previous_text = "" if previous is None else str(previous)
+            if previous_text != item.text():
                 self._undo_stack.append({
                     "record_id": record_id, "column": column["name"],
-                    "old": old_value, "new": value,
+                    "old": previous, "new": value,
                 })
                 self._undo_stack = self._undo_stack[-self._history_limit:]
                 self._redo_stack.clear()
