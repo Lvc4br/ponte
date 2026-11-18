@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -22,6 +23,15 @@ RATE_LABELS = {
     "Pap_kg_m2": "Pap_kg_m2",
     "Af_m2_m2": "Af_m2_m2",
 }
+
+
+def _sha256_file(path):
+    """Calculate a streaming SHA-256 fingerprint without loading the file in memory."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _pt_number(value):
@@ -192,6 +202,17 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
+            file_hash = _sha256_file(path)
+            file_name = Path(path).name
+            if self.repo.store.has_imported_file(file_hash):
+                QMessageBox.warning(
+                    self, "Planilha já importada",
+                    f"O arquivo '{file_name}' já foi importado anteriormente.\n\n"
+                    "A importação foi bloqueada para evitar a duplicação dos registros. "
+                    "Renomear o arquivo não altera essa verificação."
+                )
+                return
+
             from openpyxl import load_workbook
             workbook = load_workbook(path, read_only=True, data_only=False)
             try:
@@ -222,13 +243,13 @@ class MainWindow(QMainWindow):
                 f"Novos registros: {len(incoming)}\n\n"
                 f"Prévia das primeiras linhas:\n{preview}{more}\n\n"
                 "Os registros serão ADICIONADOS à base atual. "
-                "Nenhum registro existente será substituído ou deduplicado.",
+                "O arquivo será identificado por SHA-256 para impedir uma segunda importação.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
             if answer != QMessageBox.StandardButton.Yes:
                 return
-            count = self.repo.add_records(incoming)
+            count = self.repo.add_excel_records(incoming, file_hash, file_name)
             self.results = self.repo.records
             self.show_records(self.results)
             self.status.setText(
@@ -237,7 +258,8 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self, "Importação concluída",
                 f"{count} registro(s) adicionados com sucesso. "
-                "A base foi salva localmente e continuará disponível ao reabrir o aplicativo."
+                "O arquivo foi registrado como importado e não poderá ser adicionado novamente. "
+                "A proteção permanece ativa ao reabrir o aplicativo."
             )
         except Exception as exc:
             QMessageBox.warning(self, "Falha na importação", str(exc))
