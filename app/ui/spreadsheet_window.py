@@ -488,8 +488,9 @@ class SpreadsheetWindow(QMainWindow):
             text, ok = QInputDialog.getText(self, "Pesquisar filtro", f"Valor em “{name}” contém:")
             if ok:
                 if text.strip():
+                    needle = text.strip().casefold()
                     self._filters[name] = {
-                        value for value in values if text.casefold() in value.casefold()
+                        value for value in values if needle in value.casefold()
                     }
                 else:
                     self._filters.pop(name, None)
