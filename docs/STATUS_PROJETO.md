@@ -14,6 +14,7 @@
 - [x] Registros sem dimensões verificáveis não são tratados como correspondências confirmadas quando o filtro correspondente está ativo.
 - [x] Estatísticas descritivas de indicadores disponíveis.
 - [x] Importação aditiva de planilhas Excel .xlsx, com detecção de cabeçalho, seleção de aba e prévia.
+- [x] Bloqueio persistente de reimportação do mesmo arquivo por SHA-256, inclusive após renomeação.
 - [x] Validação de cabeçalhos equivalentes duplicados.
 - [x] Exclusão de registros selecionados com confirmação e backup.
 - [x] Preservação de campos originais, valores ausentes e intervalos textuais.
