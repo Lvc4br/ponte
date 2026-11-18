@@ -16,7 +16,7 @@ import tempfile
 import zipfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 @dataclass
@@ -60,8 +60,14 @@ class DocumentScanner:
         ".tiff", ".bmp", ".webp", ".gif",
     }
 
-    def scan_many(self, paths: list[str | Path]) -> list[DocumentScanResult]:
-        """Scan files and directory contents; isolate errors per file."""
+    def scan_many(
+        self,
+        paths: list[str | Path],
+        *,
+        progress_callback: Callable[[int, int, str], None] | None = None,
+        cancel_event=None,
+    ) -> list[DocumentScanResult]:
+        """Scan files/directories; report progress and isolate errors per file."""
         candidates: list[Path] = []
         for item in paths:
             path = Path(item).expanduser()
@@ -71,17 +77,25 @@ class DocumentScanner:
                 candidates.append(path)
         unique = sorted({item.resolve() for item in candidates}, key=lambda item: str(item).casefold())
         results = []
-        for item in unique:
+        total = len(unique)
+        if progress_callback:
+            progress_callback(0, total, "")
+        for index, item in enumerate(unique, start=1):
+            if cancel_event is not None and cancel_event.is_set():
+                break
             try:
-                results.append(self.scan(item))
+                result = self.scan(item)
             except Exception as exc:
-                results.append(DocumentScanResult(
+                result = DocumentScanResult(
                     path=str(item), file_name=item.name, extension=item.suffix.lower(),
                     mime_type=mimetypes.guess_type(item.name)[0],
                     size_bytes=item.stat().st_size if item.exists() else 0,
                     sha256="", status="error",
                     errors=[f"{type(exc).__name__}: {exc}"],
-                ))
+                )
+            results.append(result)
+            if progress_callback:
+                progress_callback(index, total, item.name)
         return results
 
     def scan(self, file_path: str | Path) -> DocumentScanResult:
