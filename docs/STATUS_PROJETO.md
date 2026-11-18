@@ -24,7 +24,7 @@
 - [ ] OCR de PDF digitalizado com posição e confiança por trecho (a extração textual OCR inicial existe, coordenadas/confiança ainda pendentes).
 - [ ] Extração aprofundada de gráficos, imagens, cotas, blocos CAD e geometria BIM.
 - [ ] Leitura direta de DWG e RVT ou conversão confiável desses formatos.
-- [ ] Inventário documental persistente no SQLite, com histórico e deduplicação.
+- [ ] Evoluir o catálogo documental para suportar projetos, versões, reanálise seletiva e histórico de alterações.
 - [ ] Modelo universal de projetos, tabelas, colunas e registros.
 - [ ] Motor tabular genérico e interface desvinculada do domínio de obras.
 - [ ] Revisão humana das extrações e conversão para registros.
