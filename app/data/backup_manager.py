@@ -16,11 +16,7 @@ class BackupError(RuntimeError):
 
 
 class DatabaseBackupManager:
-    REQUIRED_TABLES = {
-        "records", "documents", "document_sections",
-        "workspace_projects", "workspace_tables", "workspace_columns",
-        "workspace_records",
-    }
+    REQUIRED_TABLES = {"records"}
 
     def __init__(self, database_path):
         self.database_path = Path(database_path).expanduser().resolve()
@@ -61,6 +57,7 @@ class DatabaseBackupManager:
                         )
                 version = None
                 if "ponte_schema_version" in tables:
+                    db.row_factory = sqlite3.Row
                     version = [
                         dict(row) for row in db.execute(
                             "SELECT component, version FROM ponte_schema_version ORDER BY component"
@@ -129,6 +126,7 @@ class DatabaseBackupManager:
         if source == self.database_path:
             raise BackupError("O arquivo de origem já é o banco ativo.")
         details = self.verify_backup(source)
+        self.inspect(source, require_application_tables=True)
         if self.database_path.exists():
             if safety_backup is None:
                 stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
