@@ -274,6 +274,7 @@ class SpreadsheetWindow(QMainWindow):
         try:
             self.columns = self.store.list_columns(self.table_id)
             records = self.store.list_records(self.table_id)
+            total_records = len(records)
             query = self.search_input.text().strip().casefold()
             if query:
                 records = [
@@ -312,7 +313,7 @@ class SpreadsheetWindow(QMainWindow):
             self._loading = False
             active = len(self._filters)
             self.status.setText(
-                f"{len(records)} de {self.store.count_records(self.table_id)} registros · "
+                f"{len(records)} de {total_records} registros · "
                 f"{len(self.columns)} colunas · {active} filtro(s) ativo(s)"
             )
         except Exception as exc:
