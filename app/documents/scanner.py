@@ -430,9 +430,21 @@ class DocumentScanner:
         entities = []
         for entity in modelspace:
             item = {"type": entity.dxftype(), "layer": entity.dxf.get("layer")}
-            for attribute in ("text", "insert", "start", "end", "center", "radius"):
+            for attribute in ("text", "insert", "start", "end", "center", "radius",
+                              "name", "rotation", "height", "start_angle", "end_angle"):
                 if entity.dxf.hasattr(attribute):
                     item[attribute] = str(entity.dxf.get(attribute))
+            if entity.dxftype() == "LWPOLYLINE":
+                item["vertices"] = [list(point[:2]) for point in entity.get_points("xy")]
+            elif entity.dxftype() == "POLYLINE":
+                item["vertices"] = [list(vertex.dxf.location) for vertex in entity.vertices]
+            elif entity.dxftype() == "INSERT":
+                item["block_name"] = entity.dxf.name
+                item["scale"] = [
+                    entity.dxf.get("xscale", 1),
+                    entity.dxf.get("yscale", 1),
+                    entity.dxf.get("zscale", 1),
+                ]
             entities.append(item)
         result.metadata.update({
             "dxf_version": drawing.dxfversion,
@@ -462,6 +474,9 @@ class DocumentScanner:
                 capture_output=True, text=True, timeout=300, check=False,
             )
             converted = target_dir / f"{path.stem}.dxf"
+            if not converted.is_file():
+                matches = list(target_dir.glob("*.dxf")) + list(target_dir.glob("*.DXF"))
+                converted = matches[0] if matches else converted
             if completed.returncode != 0 or not converted.is_file():
                 detail = (completed.stderr or completed.stdout or "conversão não concluída").strip()
                 result.warnings.append(f"Falha na conversão DWG: {detail[:500]}")
