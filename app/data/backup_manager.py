@@ -34,45 +34,49 @@ class DatabaseBackupManager:
         path = Path(path).expanduser().resolve()
         if not path.is_file():
             raise BackupError(f"Arquivo de banco não encontrado: {path}")
+        db = None
         try:
-            with sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True) as db:
-                integrity = db.execute("PRAGMA integrity_check").fetchone()[0]
-                if integrity != "ok":
-                    raise BackupError(f"Falha de integridade SQLite: {integrity}")
-                foreign_key_errors = db.execute("PRAGMA foreign_key_check").fetchall()
-                if foreign_key_errors:
+            db = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+            integrity = db.execute("PRAGMA integrity_check").fetchone()[0]
+            if integrity != "ok":
+                raise BackupError(f"Falha de integridade SQLite: {integrity}")
+            foreign_key_errors = db.execute("PRAGMA foreign_key_check").fetchall()
+            if foreign_key_errors:
+                raise BackupError(
+                    f"Banco contém {len(foreign_key_errors)} violação(ões) de chave estrangeira."
+                )
+            tables = {
+                row[0] for row in db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            if require_application_tables:
+                missing = cls.REQUIRED_TABLES - tables
+                if missing:
                     raise BackupError(
-                        f"Banco contém {len(foreign_key_errors)} violação(ões) de chave estrangeira."
+                        "Backup não contém tabelas obrigatórias: " + ", ".join(sorted(missing))
                     )
-                tables = {
-                    row[0] for row in db.execute(
-                        "SELECT name FROM sqlite_master WHERE type='table'"
-                    )
-                }
-                if require_application_tables:
-                    missing = cls.REQUIRED_TABLES - tables
-                    if missing:
-                        raise BackupError(
-                            "Backup não contém tabelas obrigatórias: " + ", ".join(sorted(missing))
-                        )
-                version = None
-                if "ponte_schema_version" in tables:
-                    db.row_factory = sqlite3.Row
-                    version = [
-                        dict(row) for row in db.execute(
-                            "SELECT component, version FROM ponte_schema_version ORDER BY component"
-                        ).fetchall()
-                    ]
-                return {
-                    "integrity": integrity,
-                    "table_count": len(tables),
-                    "tables": sorted(tables),
-                    "schema_versions": version or [],
-                    "size_bytes": path.stat().st_size,
-                    "sha256": cls._hash(path),
-                }
+            version = None
+            if "ponte_schema_version" in tables:
+                db.row_factory = sqlite3.Row
+                version = [
+                    dict(row) for row in db.execute(
+                        "SELECT component, version FROM ponte_schema_version ORDER BY component"
+                    ).fetchall()
+                ]
+            return {
+                "integrity": integrity,
+                "table_count": len(tables),
+                "tables": sorted(tables),
+                "schema_versions": version or [],
+                "size_bytes": path.stat().st_size,
+                "sha256": cls._hash(path),
+            }
         except sqlite3.DatabaseError as exc:
             raise BackupError(f"Arquivo não é um banco SQLite válido: {exc}") from exc
+        finally:
+            if db is not None:
+                db.close()
 
     def create_backup(self, destination):
         destination = Path(destination).expanduser().resolve()
@@ -86,9 +90,13 @@ class DatabaseBackupManager:
         ) as temporary:
             temp_path = Path(temporary.name)
         try:
-            with sqlite3.connect(self.database_path) as source:
-                with sqlite3.connect(temp_path) as target:
-                    source.backup(target)
+            source = sqlite3.connect(self.database_path)
+            target = sqlite3.connect(temp_path)
+            try:
+                source.backup(target)
+            finally:
+                target.close()
+                source.close()
             details = self.inspect(temp_path)
             os.replace(temp_path, destination)
             details = self.inspect(destination)
@@ -143,9 +151,13 @@ class DatabaseBackupManager:
         ) as temporary:
             temp_path = Path(temporary.name)
         try:
-            with sqlite3.connect(source) as backup_db:
-                with sqlite3.connect(temp_path) as target_db:
-                    backup_db.backup(target_db)
+            backup_db = sqlite3.connect(source)
+            target_db = sqlite3.connect(temp_path)
+            try:
+                backup_db.backup(target_db)
+            finally:
+                target_db.close()
+                backup_db.close()
             self.inspect(temp_path)
             os.replace(temp_path, self.database_path)
             restored = self.inspect(self.database_path)
