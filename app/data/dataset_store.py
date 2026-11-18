@@ -24,6 +24,16 @@ class DatasetStore:
                 )
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS imported_excel_files (
+                    sha256 TEXT PRIMARY KEY,
+                    file_name TEXT NOT NULL,
+                    imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    record_count INTEGER NOT NULL
+                )
+                """
+            )
 
     def count(self):
         with sqlite3.connect(self.path) as connection:
@@ -56,6 +66,46 @@ class DatasetStore:
             connection.executemany(
                 "INSERT INTO records(payload) VALUES (?)", prepared
             )
+        return len(prepared)
+
+    def has_imported_file(self, sha256):
+        """Return whether this exact Excel file was already imported."""
+        with sqlite3.connect(self.path) as connection:
+            row = connection.execute(
+                "SELECT 1 FROM imported_excel_files WHERE sha256 = ?",
+                (sha256,),
+            ).fetchone()
+        return row is not None
+
+    def append_imported_file(self, sha256, file_name, records):
+        """Atomically append records and register the source file fingerprint."""
+        prepared = [
+            (json.dumps(record.values, ensure_ascii=False, default=str),)
+            for record in records
+        ]
+        if not prepared:
+            raise ValueError("A planilha não contém registros para importar.")
+
+        try:
+            with sqlite3.connect(self.path) as connection:
+                connection.execute(
+                    """
+                    INSERT INTO imported_excel_files
+                        (sha256, file_name, record_count)
+                    VALUES (?, ?, ?)
+                    """,
+                    (sha256, file_name, len(prepared)),
+                )
+                connection.executemany(
+                    "INSERT INTO records(payload) VALUES (?)", prepared
+                )
+        except sqlite3.IntegrityError as exc:
+            if self.has_imported_file(sha256):
+                raise ValueError(
+                    f"O arquivo '{file_name}' já foi importado anteriormente. "
+                    "A inclusão foi bloqueada para evitar duplicidade."
+                ) from exc
+            raise
         return len(prepared)
 
     def delete(self, record_ids):
