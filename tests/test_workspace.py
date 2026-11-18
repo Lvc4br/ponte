@@ -233,3 +233,21 @@ def test_formula_supports_column_names_with_spaces(tmp_path):
     store.add_column(table, "Total calculado", "decimal",
                      formula="[Preço unitário] * [Quantidade]")
     assert store.list_records(table)[0]["values"]["Total calculado"] == 36
+
+
+def test_exports_text_as_text_to_prevent_spreadsheet_formula_injection(tmp_path):
+    from openpyxl import load_workbook
+    store, project = build_store(tmp_path)
+    table = store.create_table(project, "Importação")
+    store.add_column(table, "Conteúdo", "text")
+    store.insert_record(table, {"Conteúdo": "=HYPERLINK(\"https://example.invalid\",\"clique\")"})
+    csv_path = tmp_path / "safe.csv"
+    xlsx_path = tmp_path / "safe.xlsx"
+    exchange = SpreadsheetExchange(store)
+    exchange.export_csv(table, csv_path)
+    exchange.export_xlsx(table, xlsx_path)
+    assert csv_path.read_text(encoding="utf-8-sig").splitlines()[1].startswith("'=")
+    workbook = load_workbook(xlsx_path, data_only=False)
+    cell = workbook.active["A2"]
+    assert cell.data_type == "s"
+    assert cell.value.startswith("=")
