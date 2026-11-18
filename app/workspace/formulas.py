@@ -60,7 +60,7 @@ class FormulaEngine:
             token = f"__ponte_ref_{len(references)}"
             references[token] = match.group(1).strip()
             return token
-        source = re.sub(r"\\[([^\\[\\]]+)\\]", replace_reference, source)
+        source = re.sub(r"\[([^\[\]]+)\]", replace_reference, source)
         return source, references
 
     def dependencies(self, expression: str) -> set[str]:
