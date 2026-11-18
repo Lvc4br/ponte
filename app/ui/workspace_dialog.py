@@ -412,11 +412,11 @@ class WorkspaceDialog(QDialog):
             return
         try:
             preview = self.exchange.preview_csv(path, limit=5)
-            sample = "\\n".join(" | ".join(str(value) for value in row) for row in preview["rows"])
+            sample = "\n".join(" | ".join(str(value) for value in row) for row in preview["rows"])
             answer = QMessageBox.question(
                 self, "Prévia do CSV",
-                f"Arquivo: {preview['file_name']}\\nSeparador: {preview['delimiter']!r}\\n\\n"
-                f"{sample}\\n\\nImportar este conteúdo como uma nova tabela?",
+                f"Arquivo: {preview['file_name']}\nSeparador: {preview['delimiter']!r}\n\n"
+                f"{sample}\n\nImportar este conteúdo como uma nova tabela?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -438,16 +438,16 @@ class WorkspaceDialog(QDialog):
             preview = self.exchange.preview_xlsx(path, limit=4)
             summary = []
             for sheet in preview["sheets"]:
-                rows = "\\n".join(
+                rows = "\n".join(
                     " | ".join(str(value) for value in row)
                     for row in sheet["rows"]
                 )
-                summary.append(f"Aba: {sheet['sheet_name']}\\n{rows}")
+                summary.append(f"Aba: {sheet['sheet_name']}\n{rows}")
             answer = QMessageBox.question(
                 self, "Prévia do Excel",
-                f"Arquivo: {preview['file_name']}\\n\\n" +
-                "\\n\\n".join(summary) +
-                "\\n\\nImportar todas as abas como tabelas deste projeto?",
+                f"Arquivo: {preview['file_name']}\n\n" +
+                "\n\n".join(summary) +
+                "\n\nImportar todas as abas como tabelas deste projeto?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
