@@ -19,9 +19,9 @@
 ## Ainda não implementado
 
 - [ ] Executar CI atualizado e corrigir falhas encontradas.
-- [ ] Scanner integrado à interface gráfica.
-- [ ] Processamento de pastas e lotes com progresso/cancelamento.
-- [ ] OCR de PDF digitalizado com posição e confiança por trecho.
+- [x] Scanner integrado à interface gráfica.
+- [x] Processamento de múltiplos arquivos e varredura recursiva via API do scanner; seleção de pastas e cancelamento ainda pendentes.
+- [ ] OCR de PDF digitalizado com posição e confiança por trecho (a extração textual OCR inicial existe, coordenadas/confiança ainda pendentes).
 - [ ] Extração aprofundada de gráficos, imagens, cotas, blocos CAD e geometria BIM.
 - [ ] Leitura direta de DWG e RVT ou conversão confiável desses formatos.
 - [ ] Inventário documental persistente no SQLite, com histórico e deduplicação.
