@@ -8,7 +8,7 @@ if exist ".venv\Scripts\python.exe" (
     set "PYTHON=python"
 )
 
-%PYTHON% -m PyInstaller --noconfirm --clean --windowed --onedir --name PONTE --collect-all pypdf --collect-all docx --collect-all pptx --collect-all openpyxl --collect-all xlrd --collect-all ezdxf --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-all pytesseract --add-data "database\ponte.sql.example;database" main.py
+%PYTHON% -m PyInstaller --noconfirm --clean --windowed --onedir --name PONTE --collect-all pypdf --collect-all pdfplumber --collect-all pyxlsb --collect-all docx --collect-all pptx --collect-all openpyxl --collect-all xlrd --collect-all ezdxf --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-all pytesseract --add-data "database\ponte.sql.example;database" main.py
 if errorlevel 1 exit /b %errorlevel%
 
 if not exist "dist\PONTE\database" mkdir "dist\PONTE\database"
