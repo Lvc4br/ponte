@@ -1,53 +1,57 @@
 # PONTE — Gerenciador Universal de Dados e Documentos
 
-Aplicativo desktop Windows, local-first, para organizar dados e documentos de projetos de diferentes áreas. O produto não é limitado a pontes ou engenharia: a base atual de pontes é um conjunto de dados legado que deve continuar acessível dentro do gerenciador universal.
+Aplicativo desktop Windows, local-first, para organizar dados e documentos de projetos de diferentes áreas. O produto não é limitado a pontes ou engenharia: a base de pontes existente permanece como um conjunto de dados legado.
 
-O objetivo de longo prazo é oferecer uma alternativa independente para parte relevante dos fluxos de planilhas, com tabelas configuráveis, documentos rastreáveis, pesquisa, análise, importação e exportação. Excel será um formato de intercâmbio, não uma dependência obrigatória.
+O objetivo é substituir uma parcela relevante dos fluxos de planilhas com tabelas próprias, tipos de dados, fórmulas, filtros, relacionamentos, documentos rastreáveis e intercâmbio com formatos comuns. Excel é formato de entrada/saída, não dependência operacional. Não há promessa de compatibilidade integral com todos os recursos do Excel.
 
-## Estado real da implementação
+## Implementado na branch main
 
-### Já existente na branch main
+### Espaço de dados genérico
+- Projetos independentes com descrição e metadados.
+- Várias tabelas por projeto.
+- Colunas dinâmicas com tipos texto, inteiro, decimal, booleano, data, data/hora e JSON.
+- CRUD de registros e tabelas, validação de tipos, campos obrigatórios e valores padrão.
+- Filtros por igualdade, diferença, contém, comparações e lista; ordenação e paginação.
+- Relacionamentos entre colunas de tabelas do mesmo projeto, com validação de tipos.
+- Colunas calculadas com fórmulas seguras, sem executar Python: operações aritméticas, comparações e funções SUM, AVERAGE, MIN, MAX, COUNT, IF, ABS, ROUND, AND, OR e NOT.
+- Referências de fórmulas com nomes compostos entre colchetes, por exemplo `=[Quantidade] * [Preço unitário]`.
+- Interface desktop para criar projetos/tabelas/colunas/registros, editar células e importar/exportar CSV e Excel.
+- Persistência SQLite com migração aditiva versionada, sem reescrever a tabela legada de pontes.
 
-- Aplicativo desktop Python/PySide6.
-- Persistência local SQLite e manutenção da base existente de obras/pontes.
-- Importação atual de planilhas .xlsx com seleção de aba, prévia e proteção contra reimportação.
-- Navegação entre base principal e planilhas importadas na interface antiga de Gestão de Obras.
-- Filtros e indicadores específicos do conjunto de dados legado.
-- Scanner documental em `app/documents/scanner.py`, com resultado padronizado, SHA-256, metadados, seções, avisos, erros e varredura recursiva em lote.
-- Ações **Analisar documentos** e **Biblioteca documental** integradas à interface, com execução em thread separada, visualização do conteúdo extraído e catálogo SQLite persistente.
-- Leitura inicial de PDF, DOCX, XLSX/XLSM, XLS, PPTX, CSV, TXT, Markdown, JSON, XML, imagens com OCR opcional, DXF e IFC opcional.
-- Testes unitários iniciais do scanner para texto, CSV, JSON, formatos ainda não suportados e arquivo inexistente.
+### Scanner e biblioteca documental
+- SHA-256, tamanho, MIME, metadados, seções extraídas, avisos e erros por arquivo.
+- Seleção de vários arquivos ou varredura recursiva de pasta.
+- Processamento em thread separada e visualização dos resultados.
+- Catálogo SQLite persistente e biblioteca para consultar análises anteriores.
+- PDF: texto por página, campos de formulário, nomes de anexos e extração inicial de tabelas; OCR de páginas digitalizadas quando Tesseract está disponível.
+- DOCX: parágrafos, tabelas, cabeçalhos e rodapés.
+- DOC, PPT, RTF, ODT e ODP: conversão local para texto quando LibreOffice está instalado.
+- XLSX/XLSM: abas, células e expressões de fórmulas; XLS: abas e valores; XLSB: abas e valores.
+- PPTX: texto e tabelas por slide.
+- CSV, TXT, Markdown, JSON e XML.
+- PNG, JPEG, TIFF, BMP, WEBP e GIF: metadados de imagem e OCR opcional.
+- DXF: entidades, camadas, vértices de polilinhas e dados básicos de blocos.
+- DWG: conversão opcional para DXF por ODA File Converter instalado.
+- IFC: produtos e conjuntos de propriedades quando IfcOpenShell está instalado.
+- RVT/RFA: reconhecidos com orientação para exportar pelo Revit para IFC/PDF; sem leitor direto integrado.
+- Limite de 512 MiB por arquivo e proteções iniciais contra arquivos Office compactados suspeitos.
 
-### Limitações importantes do scanner
+## Limitações que precisam ficar claras
 
-- PDF digitalizado pode precisar de OCR; a leitura atual de PDF extrai texto acessível, não interpreta integralmente desenhos ou anexos.
-- OCR de imagens e páginas PDF digitalizadas exige Pillow, pytesseract, pypdfium2 e o executável Tesseract instalado e configurado.
-- DXF e IFC dependem de leitores específicos; IFC requer IfcOpenShell compatível com a versão de Python.
-- DWG e RVT ainda não têm leitor integrado. Conversão e integração devem ser avaliadas separadamente.
-- A leitura inicial de DOCX/PPTX/XLSX não extrai todos os objetos incorporados, gráficos, caixas de texto, comentários, macros ou conexões externas.
-- O scanner extrai conteúdo; não certifica documentos, não valida cálculos nem substitui análise profissional de engenharia.
-- A interface já permite analisar múltiplos arquivos e consultar a biblioteca local; seleção direta de pastas, progresso detalhado e cancelamento ainda estão pendentes.
+- O scanner não interpreta semanticamente qualquer arquivo nem certifica documentos.
+- OCR requer Tesseract instalado no computador. O código tenta português+inglês e recua para inglês.
+- DOC/PPT/RTF/ODT/ODP dependem de LibreOffice instalado.
+- DWG depende do ODA File Converter instalado; a fidelidade de conversão deve ser conferida.
+- IFC depende de IfcOpenShell compatível com a versão de Python.
+- RVT/RFA não são lidos diretamente. Exportar pelo Revit para IFC é o fluxo recomendado.
+- Recursos avançados de Office (macros, gráficos, comentários, revisões, conexões, objetos incorporados) não são executados e nem todos são extraídos.
+- PDF vetorial, cotas CAD, geometria BIM e imagens incorporadas ainda exigem leitores e testes específicos.
+- Fórmulas cobrem um subconjunto inicial; não há compatibilidade integral com Excel, referências A1, macros, tabelas dinâmicas ou VBA.
+- A interface genérica é uma primeira versão funcional; ainda faltam recursos de produtividade e revisão visual antes de substituir planilhas complexas.
 
-## Arquitetura e escopo
+## Arquitetura
 
-Consulte [docs/ARQUITETURA_GERENCIADOR_UNIVERSAL.md](docs/ARQUITETURA_GERENCIADOR_UNIVERSAL.md) para princípios, matriz de formatos, limites e etapas técnicas.
-
-O desenvolvimento seguirá estas frentes:
-
-1. Scanner e adaptadores documentais testáveis.
-2. Inventário documental local, hash, histórico e rastreabilidade da origem.
-3. Processamento de arquivos e pastas em lote, relatório e revisão.
-4. OCR e extração avançada de conteúdo visual.
-5. Modelo genérico de projetos, tabelas, colunas e registros.
-6. Motor tabular, filtros, fórmulas, relações e visualizações.
-7. Importação/exportação, backup, restauração e distribuição Windows.
-
-## Dados privados e preservação
-
-- Não publicar SQL real, bancos SQLite, planilhas internas, documentos corporativos ou credenciais.
-- A base de pontes existente deve ser preservada durante a migração para o modelo genérico.
-- Os arquivos originais importados não devem ser alterados pelo scanner.
-- Releases públicos devem conter somente dados de exemplo autorizados.
+Consulte [docs/ARQUITETURA_GERENCIADOR_UNIVERSAL.md](docs/ARQUITETURA_GERENCIADOR_UNIVERSAL.md) e [docs/STATUS_PROJETO.md](docs/STATUS_PROJETO.md).
 
 ## Instalação e execução
 
@@ -55,22 +59,23 @@ Requisitos: Python 3.11 ou superior.
 
 ```powershell
 python -m venv .venv
-.\\.venv\\Scripts\\python.exe -m pip install --upgrade pip
-.\\.venv\\Scripts\\python.exe -m pip install -r requirements.txt
-.\\.venv\\Scripts\\python.exe -m pytest -v
-.\\.venv\\Scripts\\python.exe main.py
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m compileall -q app tests main.py
+.\.venv\Scripts\python.exe -m pytest -v
+.\.venv\Scripts\python.exe main.py
 ```
 
-Para gerar o executável Windows, execute `build/build_windows.bat`. O empacotamento dos novos leitores e eventuais dependências externas (como Tesseract e IfcOpenShell) ainda precisa ser validado.
+Para gerar o executável no Windows, execute `build/build_windows.bat`. O GitHub Actions também possui pipeline para testar e gerar um artefato Windows. O pacote ainda precisa ser executado em uma máquina Windows real antes da atualização do PC e dos testes de usuário.
 
-## Segurança e limites
+## Dados privados e preservação
 
-- O scanner não executa macros de Office.
-- Arquivos acima de 512 MiB são recusados pelo limite inicial do scanner.
-- Um erro de leitura é registrado no resultado daquele arquivo, sem interromper o chamador.
-- Resultados devem ser revisados antes de serem convertidos em dados oficiais.
-- Extração automática não equivale a validação técnica, estrutural, jurídica ou contábil.
+- Não publicar SQL real, bancos SQLite, planilhas internas, documentos corporativos ou credenciais.
+- A base legada de pontes deve permanecer intacta durante a evolução.
+- Os documentos originais não são modificados pelo scanner.
+- Macros e conteúdo ativo não são executados.
+- Faça backup de `data/registros.sqlite3` antes de qualquer atualização local.
 
 ## Repositório
 
-[Código-fonte](https://github.com/Lvc4br/ponte) · [Releases](https://github.com/Lvc4br/ponte/releases) · [Testes automatizados](https://github.com/Lvc4br/ponte/actions/workflows/tests.yml)
+[Código-fonte](https://github.com/Lvc4br/ponte) · [Releases](https://github.com/Lvc4br/ponte/releases) · [Testes automatizados](https://github.com/Lvc4br/ponte/actions/workflows/tests.yml) · [Pacote Windows](https://github.com/Lvc4br/ponte/actions/workflows/build-windows.yml)
