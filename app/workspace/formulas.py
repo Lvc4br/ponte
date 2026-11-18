@@ -49,6 +49,23 @@ class FormulaEngine:
     MAX_EXPRESSION_LENGTH = 2048
     MAX_POWER = 12
 
+    def dependencies(self, expression: str) -> set[str]:
+        source = expression.strip()
+        if source.startswith("="):
+            source = source[1:].strip()
+        try:
+            tree = ast.parse(source, mode="eval")
+        except SyntaxError as exc:
+            raise FormulaError(f"Sintaxe de fórmula inválida: {exc}") from exc
+        function_names = {
+            node.func.id for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        }
+        return {
+            node.id for node in ast.walk(tree)
+            if isinstance(node, ast.Name) and node.id not in function_names
+        }
+
     def evaluate(self, expression: str, context: dict[str, Any] | None = None):
         if not isinstance(expression, str):
             raise TypeError("A fórmula deve ser texto.")
