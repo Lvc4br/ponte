@@ -11,7 +11,7 @@ def test_same_excel_fingerprint_is_rejected_after_reopening_store(tmp_path):
 
     store = DatasetStore(database)
     assert store.append_imported_file(
-        fingerprint, "pontes.xlsx", records
+        fingerprint, "pontes.xlsx", "Dados", records
     ) == 1
     assert store.has_imported_file(fingerprint)
 
@@ -19,7 +19,7 @@ def test_same_excel_fingerprint_is_rejected_after_reopening_store(tmp_path):
     assert reopened_store.has_imported_file(fingerprint)
     with pytest.raises(ValueError, match="já foi importado"):
         reopened_store.append_imported_file(
-            fingerprint, "pontes-renomeado.xlsx", records
+            fingerprint, "pontes-renomeado.xlsx", "Dados", records
         )
 
     assert len(reopened_store.load()) == 1
@@ -30,6 +30,6 @@ def test_different_excel_fingerprints_can_be_imported(tmp_path):
     first = BridgeRecord({"obra": 1}, 2)
     second = BridgeRecord({"obra": 2}, 3)
 
-    assert store.append_imported_file("a" * 64, "um.xlsx", [first]) == 1
-    assert store.append_imported_file("b" * 64, "dois.xlsx", [second]) == 1
+    assert store.append_imported_file("a" * 64, "um.xlsx", "Dados", [first]) == 1
+    assert store.append_imported_file("b" * 64, "dois.xlsx", "Dados", [second]) == 1
     assert len(store.load()) == 2
