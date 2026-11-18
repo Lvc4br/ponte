@@ -13,9 +13,10 @@ from app.workspace.exchange import SpreadsheetExchange
 
 
 class WorkspaceDialog(QDialog):
-    def __init__(self, store, parent=None):
+    def __init__(self, store, document_index=None, parent=None):
         super().__init__(parent)
         self.store = store
+        self.document_index = document_index
         self.exchange = SpreadsheetExchange(store)
         self.project_id = None
         self.table_id = None
@@ -59,6 +60,8 @@ class WorkspaceDialog(QDialog):
             ("Importar Excel", self._import_xlsx),
             ("Exportar CSV", self._export_csv),
             ("Exportar Excel", self._export_xlsx),
+            ("Vincular documento", self._link_document),
+            ("Documentos do projeto", self._show_project_documents),
         ):
             button = QPushButton(label)
             button.clicked.connect(callback)
@@ -424,6 +427,44 @@ class WorkspaceDialog(QDialog):
                 self.tables.setCurrentIndex(self.tables.findData(table_ids[0]))
         except Exception as exc:
             QMessageBox.warning(self, "Importação Excel", str(exc))
+
+    def _link_document(self):
+        if self.project_id is None or self.document_index is None:
+            return
+        documents = self.document_index.list_documents()
+        if not documents:
+            QMessageBox.information(
+                self, "Documentos", "Analise ao menos um documento antes de vinculá-lo."
+            )
+            return
+        labels = [
+            f"{item['file_name']} · {item['status']} · ID {item['id']}"
+            for item in documents
+        ]
+        label, ok = QInputDialog.getItem(
+            self, "Vincular documento", "Documento analisado:", labels, 0, False
+        )
+        if not ok:
+            return
+        document = documents[labels.index(label)]
+        try:
+            self.store.link_document(self.project_id, document["id"])
+            self.status.setText(f"Documento vinculado: {document['file_name']}")
+        except Exception as exc:
+            QMessageBox.warning(self, "Vincular documento", str(exc))
+
+    def _show_project_documents(self):
+        if self.project_id is None:
+            return
+        documents = self.store.list_project_documents(self.project_id)
+        if not documents:
+            QMessageBox.information(self, "Documentos do projeto", "Nenhum documento vinculado.")
+            return
+        lines = [
+            f"{item['file_name']} · {item['extension']} · {item['status']} · {item['scanned_at']}"
+            for item in documents
+        ]
+        QMessageBox.information(self, "Documentos do projeto", "\n".join(lines))
 
     def _export_csv(self):
         if self.table_id is None:
