@@ -115,3 +115,67 @@ def test_xlsx_imports_all_sheets_and_exports(tmp_path):
     exchange.export_xlsx(table_ids[0], target)
     exported = load_workbook(target, data_only=True)
     assert exported.active["A2"].value == "A"
+
+
+def test_rename_column_preserves_existing_values(tmp_path):
+    store, project = build_store(tmp_path)
+    table = store.create_table(project, "Itens")
+    column = store.add_column(table, "Nome")
+    store.insert_record(table, {"Nome": "Original"})
+    assert store.rename_column(column, "Descrição")
+    assert store.list_records(table)[0]["values"] == {"Descrição": "Original"}
+
+
+def test_relationships_require_matching_column_types_and_same_project(tmp_path):
+    store, project = build_store(tmp_path)
+    first = store.create_table(project, "Projetos")
+    second = store.create_table(project, "Tarefas")
+    first_key = store.add_column(first, "Código", "integer")
+    second_key = store.add_column(second, "Projeto", "integer")
+    relation = store.create_relation(
+        project, first, first_key, second, second_key, "one_to_many"
+    )
+    assert store.list_relations(project)[0]["id"] == relation
+    text_key = store.add_column(second, "Texto", "text")
+    with pytest.raises(ValueError):
+        store.create_relation(project, first, first_key, second, text_key)
+
+
+def test_workspace_additive_schema_preserves_legacy_records_table(tmp_path):
+    import sqlite3
+    path = tmp_path / "legacy.sqlite3"
+    with sqlite3.connect(path) as db:
+        db.execute("CREATE TABLE records (id INTEGER PRIMARY KEY, payload TEXT NOT NULL)")
+        db.execute("INSERT INTO records(payload) VALUES ('legacy payload')")
+    store = WorkspaceStore(path)
+    project = store.create_project("Novo")
+    assert store.list_projects()[0]["id"] == project
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT payload FROM records").fetchone()[0] == "legacy payload"
+
+
+def test_document_link_uses_existing_document_catalog(tmp_path):
+    from app.documents.index import DocumentIndex
+    from app.documents.scanner import DocumentScanner
+
+    path = tmp_path / "shared.sqlite3"
+    index = DocumentIndex(path)
+    source = tmp_path / "memorial.txt"
+    source.write_text("Memorial", encoding="utf-8")
+    document_id = index.index_result(DocumentScanner().scan(source))
+    store = WorkspaceStore(path)
+    project = store.create_project("Obra")
+    assert store.link_document(project, document_id)
+    assert not store.link_document(project, document_id)
+    assert store.list_project_documents(project)[0]["file_name"] == "memorial.txt"
+
+
+def test_workspace_store_reopens_without_losing_tables_or_records(tmp_path):
+    path = tmp_path / "persistent.sqlite3"
+    store = WorkspaceStore(path)
+    project = store.create_project("Persistente")
+    table = store.create_table(project, "Dados")
+    store.add_column(table, "Valor", "integer")
+    store.insert_record(table, {"Valor": 42})
+    reopened = WorkspaceStore(path)
+    assert reopened.list_records(table)[0]["values"]["Valor"] == 42
