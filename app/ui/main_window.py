@@ -256,7 +256,7 @@ class MainWindow(QMainWindow):
         data_layout.setContentsMargins(8, 8, 8, 8)
         data_layout.setSpacing(6)
         grid_toolbar = QHBoxLayout()
-        grid_label = QLabel("PLANILHA DE REGISTROS")
+        grid_label = QLabel("PLANILHAS DO WORKSPACE")
         grid_label.setObjectName("sectionTitle")
         grid_toolbar.addWidget(grid_label)
         grid_toolbar.addStretch()
@@ -500,15 +500,6 @@ class MainWindow(QMainWindow):
         try:
             file_hash = _sha256_file(path)
             file_name = Path(path).name
-            if self.repo.store.has_imported_file(file_hash):
-                QMessageBox.warning(
-                    self, "Planilha já importada",
-                    f"O arquivo '{file_name}' já foi importado anteriormente.\n\n"
-                    "A inclusão foi bloqueada para evitar registros duplicados. "
-                    "Renomear o arquivo não altera essa verificação."
-                )
-                return
-
             from openpyxl import load_workbook
             workbook = load_workbook(path, read_only=True, data_only=False)
             try:
@@ -519,6 +510,17 @@ class MainWindow(QMainWindow):
                 self, "Selecionar aba", "Aba para importar:", sheets, 0, False
             )
             if not accepted:
+                return
+            sheet_fingerprint = hashlib.sha256(
+                f"{file_hash}:{sheet}".encode("utf-8")
+            ).hexdigest()
+            if self.repo.store.has_imported_file(sheet_fingerprint):
+                QMessageBox.warning(
+                    self, "Planilha já importada",
+                    f"A aba '{sheet}' do arquivo '{file_name}' já foi importada.\n\n"
+                    "A inclusão foi bloqueada para evitar registros duplicados. "
+                    "Renomear o arquivo não altera essa verificação."
+                )
                 return
             incoming = read_excel(path, sheet)
             sample = incoming[:5]
@@ -539,13 +541,13 @@ class MainWindow(QMainWindow):
                 f"Novos registros: {len(incoming)}\n\n"
                 f"Prévia das primeiras linhas:\n{preview}{more}\n\n"
                 "Os registros serão adicionados à base atual. "
-                "O arquivo será identificado por SHA-256 para impedir uma segunda importação.",
+                "A combinação do arquivo e da aba será identificada por SHA-256 para impedir duplicidade.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
             if answer != QMessageBox.StandardButton.Yes:
                 return
-            count = self.repo.add_excel_records(incoming, file_hash, file_name, sheet)
+            count = self.repo.add_excel_records(incoming, sheet_fingerprint, file_name, sheet)
             self.results = self.repo.records
             self._refresh_dataset_navigation(f"{file_name}::{sheet}")
             self.show_records(self._dataset_records(self._active_dataset))
@@ -554,8 +556,8 @@ class MainWindow(QMainWindow):
             )
             QMessageBox.information(
                 self, "Importação concluída",
-                f"{count} registro(s) adicionados. O arquivo foi registrado e não poderá "
-                "ser importado novamente nesta base."
+                f"{count} registro(s) adicionados. Esta aba foi registrada e não poderá "
+                "ser importada novamente nesta base."
             )
         except Exception as exc:
             QMessageBox.warning(self, "Falha na importação", str(exc))
