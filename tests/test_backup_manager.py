@@ -37,8 +37,12 @@ def test_restore_creates_safety_backup_and_restores_snapshot(tmp_path):
     manager = DatabaseBackupManager(active)
     backup = tmp_path / "backup.sqlite3"
     manager.create_backup(backup)
-    with sqlite3.connect(active) as db:
+    db = sqlite3.connect(active)
+    try:
         db.execute("UPDATE records SET payload='alterado' WHERE id=1")
+        db.commit()
+    finally:
+        db.close()
     result = manager.restore(backup)
     assert read_value(active) == "original"
     assert result["integrity"] == "ok"
