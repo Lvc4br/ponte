@@ -39,7 +39,7 @@ O objetivo é substituir uma parcela relevante dos fluxos de planilhas com tabel
 ## Limitações que precisam ficar claras
 
 - O scanner não interpreta semanticamente qualquer arquivo nem certifica documentos.
-- OCR requer Tesseract instalado no computador. O código tenta português+inglês e recua para inglês.
+- OCR requer Tesseract; o pipeline Windows tenta incluir o mecanismo e o idioma português no pacote. Builds locais podem usar Tesseract instalado no computador. O código tenta português+inglês e recua para inglês.
 - DOC/PPT/RTF/ODT/ODP dependem de LibreOffice instalado.
 - DWG depende do ODA File Converter instalado; a fidelidade de conversão deve ser conferida.
 - IFC depende de IfcOpenShell compatível com a versão de Python.
