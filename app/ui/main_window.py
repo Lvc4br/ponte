@@ -20,6 +20,8 @@ from app.documents.scanner import DocumentScanner
 from app.documents.index import DocumentIndex
 from app.ui.document_scan_dialog import DocumentScanDialog
 from app.ui.document_library_dialog import DocumentLibraryDialog
+from app.workspace.store import WorkspaceStore
+from app.ui.workspace_dialog import WorkspaceDialog
 
 
 RATE_LABELS = {
@@ -121,6 +123,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1120, 700)
         self.repo = SQLRepository()
         self.document_index = DocumentIndex()
+        self.workspace_store = WorkspaceStore()
         self.service = SearchService()
         self.results = []
         self._records_by_id = {}
@@ -163,6 +166,7 @@ class MainWindow(QMainWindow):
         actions_menu.addAction("Analisar documentos...", self.scan_documents)
         actions_menu.addAction("Analisar pasta inteira...", self.scan_document_folder)
         actions_menu.addAction("Biblioteca documental", self.open_document_library)
+        actions_menu.addAction("Espaço de dados (projetos e tabelas)", self.open_workspace)
         actions_menu.addSeparator()
         actions_menu.addAction("Excluir registros selecionados", self.delete_selected)
         self.actions_button.setMenu(actions_menu)
@@ -515,6 +519,10 @@ class MainWindow(QMainWindow):
 
     def open_document_library(self):
         dialog = DocumentLibraryDialog(self.document_index, self)
+        dialog.exec()
+
+    def open_workspace(self):
+        dialog = WorkspaceDialog(self.workspace_store, self)
         dialog.exec()
 
     def scan_documents(self):
