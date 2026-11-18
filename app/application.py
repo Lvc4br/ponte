@@ -4,7 +4,7 @@ from app.ui.main_window import MainWindow
 
 def main() -> int:
     app = QApplication(sys.argv)
-    app.setApplicationName('ConsultaTaxasPontes')
+    app.setApplicationName('GestaoDeObras')
     window = MainWindow()
     window.show()
     return app.exec()
