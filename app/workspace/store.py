@@ -231,7 +231,8 @@ class WorkspaceStore:
         name = self._name(name, "Nome da coluna")
         if data_type not in SUPPORTED_COLUMN_TYPES:
             raise ValueError(f"Tipo de coluna não suportado: {data_type}")
-        self._validate_value(name, data_type, default, bool(required))
+        if default is not None:
+            self._validate_value(name, data_type, default, bool(required))
         with self._connect() as db:
             if position is None:
                 position = db.execute(
@@ -260,10 +261,29 @@ class WorkspaceStore:
         } for r in rows]
 
     def rename_column(self, column_id: int, name: str) -> bool:
+        name = self._name(name, "Nome da coluna")
         with self._connect() as db:
+            column = db.execute(
+                "SELECT table_id, name FROM workspace_columns WHERE id=?", (int(column_id),)
+            ).fetchone()
+            if column is None:
+                return False
+            old_name = column["name"]
+            records = db.execute(
+                "SELECT id, values_json FROM workspace_records WHERE table_id=?",
+                (column["table_id"],),
+            ).fetchall()
+            for record in records:
+                values = self._decode(record["values_json"], {})
+                if old_name in values:
+                    values[name] = values.pop(old_name)
+                    db.execute(
+                        "UPDATE workspace_records SET values_json=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                        (self._json(values), record["id"]),
+                    )
             cursor = db.execute(
                 "UPDATE workspace_columns SET name=? WHERE id=?",
-                (self._name(name, "Nome da coluna"), int(column_id)),
+                (name, int(column_id)),
             )
             return cursor.rowcount == 1
 
@@ -405,10 +425,10 @@ class WorkspaceStore:
             raise ValueError("Tipo de relacionamento inválido.")
         with self._connect() as db:
             source = db.execute(
-                "SELECT table_id FROM workspace_columns WHERE id=?", (int(source_column_id),)
+                "SELECT table_id, data_type FROM workspace_columns WHERE id=?", (int(source_column_id),)
             ).fetchone()
             target = db.execute(
-                "SELECT table_id FROM workspace_columns WHERE id=?", (int(target_column_id),)
+                "SELECT table_id, data_type FROM workspace_columns WHERE id=?", (int(target_column_id),)
             ).fetchone()
             if source is None or target is None:
                 raise KeyError("Coluna de relacionamento não encontrada.")
@@ -418,6 +438,8 @@ class WorkspaceStore:
             ).fetchall()
             if source["table_id"] != int(source_table_id) or target["table_id"] != int(target_table_id):
                 raise ValueError("As colunas precisam pertencer às tabelas informadas.")
+            if source["data_type"] != target["data_type"]:
+                raise ValueError("As colunas relacionadas precisam ter tipos compatíveis.")
             if len(tables) != (1 if source_table_id == target_table_id else 2):
                 raise KeyError("Tabela de relacionamento não encontrada.")
             if any(row["project_id"] != int(project_id) for row in tables):
