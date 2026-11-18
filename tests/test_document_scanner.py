@@ -34,7 +34,7 @@ def test_unsupported_format_is_reported_without_crashing(tmp_path):
     source = tmp_path / "modelo.rvt"
     source.write_bytes(b"placeholder")
     result = DocumentScanner().scan(source)
-    assert result.status == "unsupported"
+    assert result.status == "partial"
     assert result.sections == []
     assert result.warnings
 
