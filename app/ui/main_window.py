@@ -202,7 +202,7 @@ class MainWindow(QMainWindow):
         section.setObjectName("sectionTitle")
         side.addWidget(section)
 
-        self.nav_data = QPushButton("▦   Dados das obras")
+        self.nav_data = QPushButton("▦   Base legada")
         self.nav_data.setObjectName("nav")
         self.nav_data.setCheckable(True)
         self.nav_data.setChecked(True)
@@ -272,11 +272,11 @@ class MainWindow(QMainWindow):
 
         page_header = QHBoxLayout()
         heading = QVBoxLayout()
-        self.page_title = QLabel("Dados das obras")
+        self.page_title = QLabel("Base legada — Obras e pontes")
         self.page_title.setObjectName("pageTitle")
         heading.addWidget(self.page_title)
         page_subtitle = QLabel(
-            "Organize, consulte e mantenha os registros técnicos em uma grade de trabalho."
+            "Conjunto de dados legado. Crie projetos de qualquer área no Espaço de dados."
         )
         page_subtitle.setObjectName("muted")
         heading.addWidget(page_subtitle)
@@ -306,7 +306,7 @@ class MainWindow(QMainWindow):
         data_layout.setContentsMargins(8, 8, 8, 8)
         data_layout.setSpacing(6)
         grid_toolbar = QHBoxLayout()
-        grid_label = QLabel("PLANILHAS DO WORKSPACE")
+        grid_label = QLabel("REGISTROS DA BASE LEGADA")
         grid_label.setObjectName("sectionTitle")
         grid_toolbar.addWidget(grid_label)
         grid_toolbar.addStretch()
