@@ -11,8 +11,8 @@ if not exist ".venv\Scripts\python.exe" (
 .venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --windowed --onedir --name PONTE --collect-all pypdf --collect-all docx --collect-all pptx --collect-all openpyxl --collect-all xlrd --collect-all ezdxf --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-all pytesseract --add-data "database\ponte.sql.example;database" main.py
 if errorlevel 1 exit /b %errorlevel%
 
-if not exist "dist\PONTE\database" mkdir "dist\ConsultaTaxasPontes\database"
-copy /Y "database\ponte.sql.example" "dist\ConsultaTaxasPontes\database\ponte.sql.example" >nul
+if not exist "dist\PONTE\database" mkdir "dist\PONTE\database"
+copy /Y "database\ponte.sql.example" "dist\PONTE\database\ponte.sql.example" >nul
 copy /Y "README.md" "dist\PONTE\LEIA-ME.txt" >nul
 
 echo.
