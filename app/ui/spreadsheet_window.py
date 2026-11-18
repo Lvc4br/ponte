@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
@@ -41,9 +41,18 @@ QMenu::item:selected { background:#76532f; }
 
 
 class SpreadsheetGrid(QTableWidget):
-    """Spreadsheet grid with TSV copy/paste support."""
+    """Spreadsheet grid with TSV copy/paste and history shortcuts."""
+
+    undo_requested = Signal()
+    redo_requested = Signal()
 
     def keyPressEvent(self, event):
+        if event.matches(QKeySequence.StandardKey.Undo):
+            self.undo_requested.emit()
+            return
+        if event.matches(QKeySequence.StandardKey.Redo):
+            self.redo_requested.emit()
+            return
         if event.matches(QKeySequence.StandardKey.Copy):
             ranges = self.selectedRanges()
             if not ranges:
@@ -95,6 +104,10 @@ class SpreadsheetWindow(QMainWindow):
         self._loading = False
         self._records = []
         self._filters: dict[str, set[str]] = {}
+        self._conditions: dict[str, tuple[str, object]] = {}
+        self._undo_stack = []
+        self._redo_stack = []
+        self._history_limit = 500
         self._sort_column = None
         self._sort_descending = False
         self._legacy_window = None
@@ -146,6 +159,8 @@ class SpreadsheetWindow(QMainWindow):
             ("＋ Registro", self._new_record),
             ("Coluna calculada", self._new_formula_column),
             ("Limpar filtros", self._clear_filters),
+            ("Desfazer", self._undo),
+            ("Refazer", self._redo),
             ("Excluir linhas", self._delete_selected),
             ("Importar Excel", self._import_excel),
             ("Exportar Excel", self._export_excel),
@@ -189,6 +204,8 @@ class SpreadsheetWindow(QMainWindow):
         self.grid.horizontalHeader().sectionClicked.connect(self._header_clicked)
         self.grid.itemChanged.connect(self._cell_changed)
         self.grid.currentCellChanged.connect(self._selection_changed)
+        self.grid.undo_requested.connect(self._undo)
+        self.grid.redo_requested.connect(self._redo)
 
         docs_split = QSplitter(Qt.Orientation.Vertical)
         docs_split.addWidget(self.grid)
@@ -254,12 +271,14 @@ class SpreadsheetWindow(QMainWindow):
         self.table_combo.blockSignals(False)
         self.table_id = self.table_combo.currentData()
         self._filters.clear()
+        self._conditions.clear()
         self._refresh_grid()
         self._refresh_documents()
 
     def _table_changed(self, index):
         self.table_id = self.table_combo.currentData() if index >= 0 else None
         self._filters.clear()
+        self._conditions.clear()
         self._refresh_grid()
 
     def _refresh_grid(self, *_):
@@ -284,11 +303,16 @@ class SpreadsheetWindow(QMainWindow):
                 ]
             for name, allowed in self._filters.items():
                 records = [record for record in records if str(record["values"].get(name, "")) in allowed]
+            for name, (operator, target) in self._conditions.items():
+                records = [record for record in records if self._matches_condition(record["values"].get(name), operator, target)]
             if self._sort_column:
+                sort_column = next((c for c in self.columns if c["name"] == self._sort_column), None)
+                numeric = bool(sort_column and sort_column["data_type"] in {"integer", "decimal"})
                 records.sort(
                     key=lambda record: (
                         record["values"].get(self._sort_column) is None,
-                        record["values"].get(self._sort_column),
+                        (float(record["values"].get(self._sort_column) or 0) if numeric
+                         else str(record["values"].get(self._sort_column) or "").casefold()),
                     ),
                     reverse=self._sort_descending,
                 )
@@ -309,15 +333,17 @@ class SpreadsheetWindow(QMainWindow):
                     value = record["values"].get(column["name"])
                     item = QTableWidgetItem("" if value is None else str(value))
                     item.setData(Qt.ItemDataRole.UserRole, column["name"])
+                    item.setData(Qt.ItemDataRole.UserRole + 1, item.text())
                     if column.get("formula"):
                         item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                         item.setToolTip(f"Coluna calculada · {column['formula']}")
                     self.grid.setItem(row, col, item)
             self._loading = False
-            active = len(self._filters)
+            active = len(self._filters) + len(self._conditions)
             self.status.setText(
                 f"{len(records)} de {total_records} registros · "
-                f"{len(self.columns)} colunas · {active} filtro(s) ativo(s)"
+                f"{len(self.columns)} colunas · {active} filtro(s) ativo(s) · "
+                f"{len(self._undo_stack)} ação(ões) para desfazer"
             )
         except Exception as exc:
             self._loading = False
@@ -333,6 +359,7 @@ class SpreadsheetWindow(QMainWindow):
         sort_desc = menu.addAction("Ordenar de Z a A / maior a menor")
         menu.addSeparator()
         search_action = menu.addAction("Pesquisar valor…")
+        condition_action = menu.addAction("Filtrar por condição…")
         menu.addSeparator()
         all_action = menu.addAction("Selecionar todos os valores")
         clear_action = menu.addAction("Limpar filtro desta coluna")
@@ -381,6 +408,7 @@ class SpreadsheetWindow(QMainWindow):
                 self._filters.pop(name, None)
             else:
                 self._filters[name] = new_selected
+            self._conditions.pop(name, None)
             self._conditions.pop(name, None)
         else:
             return
