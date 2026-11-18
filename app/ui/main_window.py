@@ -161,6 +161,7 @@ class MainWindow(QMainWindow):
         actions_menu.addAction("Recarregar fonte SQL", self.load_sql)
         actions_menu.addAction("Importar planilha Excel (base legada)", self.import_excel)
         actions_menu.addAction("Analisar documentos...", self.scan_documents)
+        actions_menu.addAction("Analisar pasta inteira...", self.scan_document_folder)
         actions_menu.addAction("Biblioteca documental", self.open_document_library)
         actions_menu.addSeparator()
         actions_menu.addAction("Excluir registros selecionados", self.delete_selected)
@@ -523,8 +524,17 @@ class MainWindow(QMainWindow):
             "",
             "Documentos suportados (*.pdf *.docx *.xlsx *.xlsm *.xls *.pptx *.csv *.txt *.md *.json *.xml *.dxf *.ifc *.png *.jpg *.jpeg *.tif *.tiff *.bmp);;Todos os arquivos (*.*)",
         )
-        if not paths:
-            return
+        if paths:
+            self._start_document_scan(paths)
+
+    def scan_document_folder(self):
+        folder = QFileDialog.getExistingDirectory(
+            self, "Selecionar pasta para varredura recursiva"
+        )
+        if folder:
+            self._start_document_scan([folder])
+
+    def _start_document_scan(self, paths):
         self.scan_progress = QProgressDialog(
             "Analisando documentos localmente. Arquivos grandes podem levar algum tempo...",
             "", 0, 0, self,
