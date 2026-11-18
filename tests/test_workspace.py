@@ -251,3 +251,49 @@ def test_exports_text_as_text_to_prevent_spreadsheet_formula_injection(tmp_path)
     cell = workbook.active["A2"]
     assert cell.data_type == "s"
     assert cell.value.startswith("=")
+
+
+def test_import_preview_and_duplicate_csv_guard(tmp_path):
+    store, project = build_store(tmp_path)
+    source = tmp_path / "dados.csv"
+    source.write_text("Nome,Valor\nA,1\n", encoding="utf-8")
+    exchange = SpreadsheetExchange(store)
+    preview = exchange.preview_csv(source, limit=1)
+    assert preview["rows"] == [["Nome", "Valor"], ["A", "1"]]
+    exchange.import_csv(project, source)
+    with pytest.raises(ValueError, match="Já existe uma tabela"):
+        exchange.import_csv(project, source)
+    assert [table["name"] for table in store.list_tables(project)] == ["dados"]
+
+
+def test_xlsx_import_rolls_back_all_sheets_when_one_name_conflicts(tmp_path):
+    from openpyxl import Workbook
+    store, project = build_store(tmp_path)
+    existing = store.create_table(project, "Conflito")
+    source = tmp_path / "multi.xlsx"
+    workbook = Workbook()
+    workbook.active.title = "Nova"
+    workbook.active.append(["Campo"])
+    workbook.active.append(["A"])
+    conflict = workbook.create_sheet("Conflito")
+    conflict.append(["Campo"])
+    conflict.append(["B"])
+    workbook.save(source)
+    with pytest.raises(ValueError, match="Já existe uma tabela"):
+        SpreadsheetExchange(store).import_xlsx(project, source)
+    assert [table["name"] for table in store.list_tables(project)] == ["Conflito"]
+    assert store.list_records(existing) == []
+
+
+def test_xlsx_preview_lists_sheet_samples(tmp_path):
+    from openpyxl import Workbook
+    store, project = build_store(tmp_path)
+    source = tmp_path / "preview.xlsx"
+    workbook = Workbook()
+    workbook.active.title = "Resumo"
+    workbook.active.append(["A", "B"])
+    workbook.active.append([1, 2])
+    workbook.save(source)
+    preview = SpreadsheetExchange(store).preview_xlsx(source, limit=1)
+    assert preview["sheets"][0]["sheet_name"] == "Resumo"
+    assert preview["sheets"][0]["rows"] == [["A", "B"], [1, 2]]
