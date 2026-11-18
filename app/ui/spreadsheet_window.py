@@ -144,10 +144,11 @@ class SpreadsheetWindow(QMainWindow):
             ("＋ Nova tabela", self._new_table),
             ("＋ Coluna", self._new_column),
             ("＋ Registro", self._new_record),
+            ("Coluna calculada", self._new_formula_column),
+            ("Limpar filtros", self._clear_filters),
             ("Excluir linhas", self._delete_selected),
             ("Importar Excel", self._import_excel),
             ("Exportar Excel", self._export_excel),
-            ("Desfazer edição", self._undo_placeholder),
             ("Documentos +", self._link_document),
             ("Base legada", self._open_legacy),
         ]
@@ -285,8 +286,10 @@ class SpreadsheetWindow(QMainWindow):
                 records = [record for record in records if str(record["values"].get(name, "")) in allowed]
             if self._sort_column:
                 records.sort(
-                    key=lambda record: (record["values"].get(self._sort_column) is None,
-                                        str(record["values"].get(self._sort_column) or "").casefold()),
+                    key=lambda record: (
+                        record["values"].get(self._sort_column) is None,
+                        record["values"].get(self._sort_column),
+                    ),
                     reverse=self._sort_descending,
                 )
             self._records = records
@@ -500,7 +503,7 @@ class SpreadsheetWindow(QMainWindow):
             QMessageBox.warning(self, "Registro", str(exc))
 
     def _delete_selected(self):
-        rows = sorted({index.row() for index in self.grid.selectionModel().selectedRows()})
+        rows = sorted({index.row() for index in self.grid.selectionModel().selectedIndexes()})
         if not rows and self.grid.currentRow() >= 0:
             rows = [self.grid.currentRow()]
         ids = [
@@ -558,6 +561,37 @@ class SpreadsheetWindow(QMainWindow):
                 self.status.setText(f"Planilha exportada: {path}")
             except Exception as exc:
                 QMessageBox.warning(self, "Exportar Excel", str(exc))
+
+    def _clear_filters(self):
+        self._filters.clear()
+        self.search_input.clear()
+        self._sort_column = None
+        self._sort_descending = False
+        self._refresh_grid()
+
+    def _new_formula_column(self):
+        if self.table_id is None:
+            QMessageBox.information(self, "Fórmula", "Selecione uma tabela primeiro.")
+            return
+        name, ok = QInputDialog.getText(self, "Coluna calculada", "Nome da coluna:")
+        if not ok:
+            return
+        formula, ok = QInputDialog.getText(
+            self, "Fórmula", "Expressão (ex.: [Quantidade] * [Preço unitário]):"
+        )
+        if not ok:
+            return
+        data_type, ok = QInputDialog.getItem(
+            self, "Tipo do resultado", "Tipo:",
+            ["decimal", "integer", "text", "boolean", "date", "datetime", "json"], 0, False
+        )
+        if not ok:
+            return
+        try:
+            self.store.add_column(self.table_id, name, data_type, formula=formula)
+            self._refresh_grid()
+        except Exception as exc:
+            QMessageBox.warning(self, "Fórmula inválida", str(exc))
 
     def _refresh_documents(self):
         self.document_tree.clear()
@@ -628,9 +662,3 @@ class SpreadsheetWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.warning(self, "Base legada", str(exc))
 
-    def _undo_placeholder(self):
-        QMessageBox.information(
-            self, "Desfazer",
-            "O histórico de desfazer/refazer será implementado na próxima etapa. "
-            "As alterações atuais são salvas automaticamente no banco local."
-        )
