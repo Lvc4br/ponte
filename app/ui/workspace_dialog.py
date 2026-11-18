@@ -431,11 +431,17 @@ class WorkspaceDialog(QDialog):
     def _import_xlsx(self):
         if self.project_id is None:
             return
-        path, _ = QFileDialog.getOpenFileName(self, "Importar Excel", "", "Excel (*.xlsx *.xlsm)")
+        path, _ = QFileDialog.getOpenFileName(self, "Importar Excel", "", "Excel (*.xlsx *.xlsm *.xls *.xlsb)")
         if not path:
             return
         try:
-            preview = self.exchange.preview_xlsx(path, limit=4)
+            extension = Path(path).suffix.lower()
+            if extension == ".xls":
+                preview = self.exchange.preview_xls(path, limit=4)
+            elif extension == ".xlsb":
+                preview = self.exchange.preview_xlsb(path, limit=4)
+            else:
+                preview = self.exchange.preview_xlsx(path, limit=4)
             summary = []
             for sheet in preview["sheets"]:
                 rows = "\n".join(
@@ -453,7 +459,12 @@ class WorkspaceDialog(QDialog):
             )
             if answer != QMessageBox.StandardButton.Yes:
                 return
-            table_ids = self.exchange.import_xlsx(self.project_id, path)
+            if extension == ".xls":
+                table_ids = self.exchange.import_xls(self.project_id, path)
+            elif extension == ".xlsb":
+                table_ids = self.exchange.import_xlsb(self.project_id, path)
+            else:
+                table_ids = self.exchange.import_xlsx(self.project_id, path)
             self._project_changed(self.projects.currentIndex())
             if table_ids:
                 self.tables.setCurrentIndex(self.tables.findData(table_ids[0]))
