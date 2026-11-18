@@ -110,7 +110,17 @@ class SpreadsheetExchange:
             writer = csv.writer(stream)
             writer.writerow([column["name"] for column in columns])
             for record in records:
-                writer.writerow([record["values"].get(c["name"]) for c in columns])
+                row = []
+                for column in columns:
+                    value = record["values"].get(column["name"])
+                    if (
+                        column["data_type"] == "text"
+                        and isinstance(value, str)
+                        and value.lstrip().startswith(("=", "+", "-", "@", "\t", "\r"))
+                    ):
+                        value = "'" + value
+                    row.append(value)
+                writer.writerow(row)
 
     def export_xlsx(self, table_id: int, path: str | Path, *, sheet_name="Dados"):
         from openpyxl import Workbook
@@ -122,5 +132,14 @@ class SpreadsheetExchange:
         sheet.title = sheet_name[:31] or "Dados"
         sheet.append([column["name"] for column in columns])
         for record in records:
-            sheet.append([record["values"].get(c["name"]) for c in columns])
+            row_index = sheet.max_row + 1
+            for column_index, column in enumerate(columns, start=1):
+                value = record["values"].get(column["name"])
+                cell = sheet.cell(row=row_index, column=column_index, value=value)
+                if (
+                    column["data_type"] == "text"
+                    and isinstance(value, str)
+                    and value.lstrip().startswith(("=", "+", "-", "@", "\t", "\r"))
+                ):
+                    cell.data_type = "s"
         workbook.save(path)
