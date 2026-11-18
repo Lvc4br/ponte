@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+from datetime import date, datetime
 from pathlib import Path
 
 from app.workspace.store import WorkspaceStore
@@ -19,6 +20,10 @@ class SpreadsheetExchange:
             return "text"
         if all(isinstance(v, bool) for v in present):
             return "boolean"
+        if all(isinstance(v, datetime) for v in present):
+            return "datetime"
+        if all(isinstance(v, date) and not isinstance(v, datetime) for v in present):
+            return "date"
         if all(isinstance(v, int) and not isinstance(v, bool) for v in present):
             return "integer"
         if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in present):
@@ -39,12 +44,19 @@ class SpreadsheetExchange:
         table_id = self.store.create_table(project_id, name, description)
         for index, header in enumerate(headers):
             values = [row[index] if index < len(row) else None for row in rows]
-            self.store.add_column(table_id, header, self._infer_type(values), position=index)
+            data_type = self._infer_type(values)
+            self.store.add_column(table_id, header, data_type, position=index)
         for row in rows:
-            values = {
-                header: (row[index] if index < len(row) else None)
-                for index, header in enumerate(headers)
-            }
+            values = {}
+            for index, header in enumerate(headers):
+                value = row[index] if index < len(row) else None
+                if isinstance(value, (datetime, date)):
+                    value = value.isoformat()
+                elif value is not None and self._infer_type(
+                    [item[index] if index < len(item) else None for item in rows]
+                ) == "text" and not isinstance(value, str):
+                    value = str(value)
+                values[header] = value
             self.store.insert_record(table_id, values)
         return table_id
 
