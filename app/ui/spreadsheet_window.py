@@ -780,6 +780,9 @@ class SpreadsheetWindow(QMainWindow):
         failures = []
         try:
             for result in results:
+                if not result.sha256:
+                    failures.append(result.file_name)
+                    continue
                 document_id = self.documents.index_result(result)
                 if self.store.link_document(self.project_id, document_id):
                     linked += 1
