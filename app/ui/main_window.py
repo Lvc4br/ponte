@@ -40,7 +40,10 @@ QFrame#topbar, QFrame#sidebar, QFrame#properties, QFrame#panel {
 }
 QLabel { color: #d8dce2; }
 QLabel#brand { color: #f1a34a; font-size: 17px; font-weight: 800; letter-spacing: 1px; }
-QLabel#pageTitle { color: #f4f5f7; font-size: 21px; font-weight: 700; }
+QLabel#pageTitle { color: #f4f5f7; font-size: 23px; font-weight: 700; }
+QLabel#muted { line-height: 1.25; }
+QPushButton { min-height: 18px; }
+QPushButton#nav { min-height: 20px; }
 QLabel#muted { color: #9ba3af; }
 QLabel#sectionTitle { color: #f0a34a; font-size: 11px; font-weight: 800; }
 QLineEdit {
@@ -193,8 +196,8 @@ class MainWindow(QMainWindow):
 
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setMinimumWidth(205)
-        sidebar.setMaximumWidth(235)
+        sidebar.setMinimumWidth(175)
+        sidebar.setMaximumWidth(205)
         side = QVBoxLayout(sidebar)
         side.setContentsMargins(10, 14, 10, 12)
         side.setSpacing(7)
@@ -267,11 +270,13 @@ class MainWindow(QMainWindow):
 
         center = QWidget()
         center_layout = QVBoxLayout(center)
-        center_layout.setContentsMargins(8, 0, 8, 0)
-        center_layout.setSpacing(8)
+        center_layout.setContentsMargins(4, 0, 4, 0)
+        center_layout.setSpacing(10)
 
-        page_header = QHBoxLayout()
+        page_header = QVBoxLayout()
+        page_header.setSpacing(10)
         heading = QVBoxLayout()
+        heading.setSpacing(3)
         self.page_title = QLabel("Base legada — Obras e pontes")
         self.page_title.setObjectName("pageTitle")
         heading.addWidget(self.page_title)
@@ -279,10 +284,12 @@ class MainWindow(QMainWindow):
             "Conjunto de dados legado. Crie projetos de qualquer área no Espaço de dados."
         )
         page_subtitle.setObjectName("muted")
+        page_subtitle.setWordWrap(True)
         heading.addWidget(page_subtitle)
         page_header.addLayout(heading)
-        page_header.addStretch()
 
+        actions_row = QHBoxLayout()
+        actions_row.setSpacing(7)
         self.import_button = QPushButton("＋  Importar Excel")
         self.import_button.setObjectName("primary")
         self.import_button.clicked.connect(self.import_excel)
@@ -292,10 +299,12 @@ class MainWindow(QMainWindow):
         self.reload_button.clicked.connect(self.load_sql)
         self.delete_button = QPushButton("Excluir selecionados")
         self.delete_button.clicked.connect(self.delete_selected)
-        page_header.addWidget(self.import_button)
-        page_header.addWidget(self.scan_button)
-        page_header.addWidget(self.reload_button)
-        page_header.addWidget(self.delete_button)
+        actions_row.addWidget(self.import_button)
+        actions_row.addWidget(self.scan_button)
+        actions_row.addWidget(self.reload_button)
+        actions_row.addWidget(self.delete_button)
+        actions_row.addStretch()
+        page_header.addLayout(actions_row)
         center_layout.addLayout(page_header)
 
         self.tabs = QTabWidget()
@@ -303,8 +312,8 @@ class MainWindow(QMainWindow):
 
         data_page = QWidget()
         data_layout = QVBoxLayout(data_page)
-        data_layout.setContentsMargins(8, 8, 8, 8)
-        data_layout.setSpacing(6)
+        data_layout.setContentsMargins(10, 10, 10, 10)
+        data_layout.setSpacing(8)
         grid_toolbar = QHBoxLayout()
         grid_label = QLabel("REGISTROS DA BASE LEGADA")
         grid_label.setObjectName("sectionTitle")
@@ -336,9 +345,9 @@ class MainWindow(QMainWindow):
         self.table.verticalHeader().setDefaultSectionSize(27)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.table.horizontalHeader().setDefaultSectionSize(145)
+        self.table.horizontalHeader().setDefaultSectionSize(125)
         self.table.horizontalHeader().setMinimumSectionSize(75)
-        self.table.horizontalHeader().setStretchLastSection(False)
+        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.itemSelectionChanged.connect(self._update_properties)
         self.table.currentCellChanged.connect(
             lambda *_: self._update_properties()
@@ -386,8 +395,8 @@ class MainWindow(QMainWindow):
 
         properties = QFrame()
         properties.setObjectName("properties")
-        properties.setMinimumWidth(245)
-        properties.setMaximumWidth(315)
+        properties.setMinimumWidth(205)
+        properties.setMaximumWidth(255)
         props = QVBoxLayout(properties)
         props.setContentsMargins(12, 14, 12, 12)
         props.setSpacing(8)
@@ -414,7 +423,7 @@ class MainWindow(QMainWindow):
         body.setStretchFactor(0, 0)
         body.setStretchFactor(1, 1)
         body.setStretchFactor(2, 0)
-        body.setSizes([215, 1000, 285])
+        body.setSizes([185, 850, 225])
         root.addWidget(body, 1)
 
         self.setCentralWidget(workspace)
