@@ -522,7 +522,7 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def open_workspace(self):
-        dialog = WorkspaceDialog(self.workspace_store, self)
+        dialog = WorkspaceDialog(self.workspace_store, self.document_index, self)
         dialog.exec()
 
     def scan_documents(self):
