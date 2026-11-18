@@ -102,6 +102,11 @@ class FormulaEngine:
             name = node.func.id.upper()
             if name not in _FUNCTIONS:
                 raise FormulaError(f"Função não permitida: {name}")
+            if name == "IF":
+                if len(node.args) != 3:
+                    raise FormulaError("IF exige exatamente três argumentos.")
+                condition = self._node(node.args[0], context)
+                return self._node(node.args[1] if condition else node.args[2], context)
             args = [self._node(item, context) for item in node.args]
             return _FUNCTIONS[name](*args)
         raise FormulaError(f"Operação não permitida: {type(node).__name__}")
