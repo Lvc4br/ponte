@@ -29,7 +29,7 @@ O PONTE é um aplicativo desktop local-first para organizar dados e documentos d
 
 | Formato | Leitura inicial | Limites conhecidos |
 |---|---|---|
-| PDF | Texto por página e metadados | PDF digitalizado precisa de OCR; formulários, vetores e anexos exigem leitores adicionais |
+| PDF | Texto por página e metadados | PDF digitalizado usa OCR opcional (Tesseract); formulários, vetores e anexos exigem leitores adicionais |
 | DOCX | Parágrafos, tabelas, cabeçalhos e rodapés | Caixas de texto, comentários, revisões e objetos incorporados podem exigir adaptadores extras |
 | XLSX/XLSM | Abas, células e expressões de fórmulas | Macros não são executadas; gráficos, imagens, conexões e objetos precisam de extração específica |
 | XLS | Abas e valores de células | Fórmulas e recursos legados têm fidelidade limitada |
