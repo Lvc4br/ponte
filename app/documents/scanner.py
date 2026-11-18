@@ -10,6 +10,8 @@ import csv
 import hashlib
 import json
 import mimetypes
+import os
+import sys
 import shutil
 import subprocess
 import tempfile
@@ -230,12 +232,36 @@ class DocumentScanner:
             result.warnings.append(f"Extração de tabelas PDF incompleta: {exc}")
 
     @staticmethod
+    def _configure_tesseract(pytesseract) -> None:
+        executable = shutil.which("tesseract")
+        if executable:
+            pytesseract.pytesseract.tesseract_cmd = executable
+            return
+        if getattr(sys, "frozen", False):
+            root = Path(sys.executable).resolve().parent
+        else:
+            root = Path(__file__).resolve().parents[2]
+        candidates = [
+            root / "Tesseract-OCR" / "tesseract.exe",
+            root / "Tesseract-OCR" / "tesseract",
+            root / "_internal" / "Tesseract-OCR" / "tesseract.exe",
+        ]
+        for candidate in candidates:
+            if candidate.is_file():
+                pytesseract.pytesseract.tesseract_cmd = str(candidate)
+                tessdata = candidate.parent / "tessdata"
+                if tessdata.is_dir():
+                    os.environ["TESSDATA_PREFIX"] = str(tessdata)
+                return
+
+    @staticmethod
     def _ocr_pdf_page(path: Path, page_index: int) -> tuple[str, str | None]:
         try:
             import pypdfium2 as pdfium
             import pytesseract
         except ImportError:
             return "", "OCR indisponível; instale pypdfium2, Pillow, pytesseract e Tesseract."
+        DocumentScanner._configure_tesseract(pytesseract)
         document = None
         try:
             document = pdfium.PdfDocument(str(path))
@@ -439,6 +465,7 @@ class DocumentScanner:
             )
             result.metadata["ocr_dependency_error"] = str(exc)
             return
+        DocumentScanner._configure_tesseract(pytesseract)
         with Image.open(path) as image:
             result.metadata.update({
                 "image_width": image.width, "image_height": image.height,
