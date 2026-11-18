@@ -69,8 +69,7 @@ class DatasetStore:
             return 0
         with sqlite3.connect(self.path) as connection:
             connection.executemany(
-                """INSERT INTO records(payload, source_file, source_sheet) VALUES (?, ?, ?)""",
-                    [(payload, file_name, sheet_name) for (payload,) in prepared]
+                "INSERT INTO records(payload) VALUES (?)", prepared
             )
         return len(prepared)
 
@@ -103,7 +102,9 @@ class DatasetStore:
                     (sha256, file_name, len(prepared)),
                 )
                 connection.executemany(
-                    "INSERT INTO records(payload) VALUES (?)", prepared
+                    """INSERT INTO records(payload, source_file, source_sheet)
+                       VALUES (?, ?, ?)""",
+                    [(payload, file_name, sheet_name) for (payload,) in prepared],
                 )
         except sqlite3.IntegrityError as exc:
             if self.has_imported_file(sha256):
