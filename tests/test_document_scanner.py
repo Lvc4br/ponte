@@ -43,3 +43,90 @@ def test_missing_file_raises_clear_error(tmp_path):
     import pytest
     with pytest.raises(FileNotFoundError):
         DocumentScanner().scan(tmp_path / "nao-existe.pdf")
+
+
+def test_scans_pdf_pages(tmp_path):
+    from pypdf import PdfWriter
+
+    source = tmp_path / "manual.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    with source.open("wb") as stream:
+        writer.write(stream)
+
+    result = DocumentScanner().scan(source)
+
+    assert result.status == "partial"
+    assert result.metadata["page_count"] == 1
+    assert result.sections[0].locator == "page:1"
+
+
+def test_scans_docx_paragraph_and_table(tmp_path):
+    from docx import Document
+
+    source = tmp_path / "memorial.docx"
+    document = Document()
+    document.add_paragraph("Memorial descritivo")
+    table = document.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = "Item"
+    table.cell(0, 1).text = "Quantidade"
+    document.save(source)
+
+    result = DocumentScanner().scan(source)
+
+    assert result.status == "partial"
+    assert any(section.kind == "paragraph" for section in result.sections)
+    assert any(section.kind == "table" for section in result.sections)
+
+
+def test_scans_xlsx_sheets_and_formula_expressions(tmp_path):
+    from openpyxl import Workbook
+
+    source = tmp_path / "quantitativos.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Quantitativos"
+    sheet.append(["Item", "Quantidade"])
+    sheet.append(["Concreto", 12])
+    sheet["C2"] = "=B2*2"
+    workbook.save(source)
+
+    result = DocumentScanner().scan(source)
+
+    assert result.status == "partial"
+    assert result.metadata["sheet_names"] == ["Quantitativos"]
+    rows = result.sections[0].content["rows"]
+    assert rows[1][2] == "=B2*2"
+
+
+def test_scans_pptx_slide_text(tmp_path):
+    from pptx import Presentation
+    from pptx.util import Inches
+
+    source = tmp_path / "apresentacao.pptx"
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    shape = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(5), Inches(1))
+    shape.text = "Projeto executivo"
+    presentation.save(source)
+
+    result = DocumentScanner().scan(source)
+
+    assert result.status == "partial"
+    assert result.metadata["slide_count"] == 1
+    assert "Projeto executivo" in str(result.sections[0].content)
+
+
+def test_scans_dxf_entities_when_reader_is_installed(tmp_path):
+    import ezdxf
+
+    source = tmp_path / "desenho.dxf"
+    drawing = ezdxf.new()
+    drawing.modelspace().add_line((0, 0), (10, 5))
+    drawing.saveas(source)
+
+    result = DocumentScanner().scan(source)
+
+    assert result.status == "success"
+    assert result.metadata["entity_count"] == 1
+    assert result.sections[0].kind == "cad_entities"
