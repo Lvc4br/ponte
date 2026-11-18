@@ -168,3 +168,30 @@ def test_legacy_doc_without_libreoffice_is_reported_as_partial(tmp_path, monkeyp
     assert result.status == "partial"
     assert result.warnings
     assert result.sections == []
+
+
+def test_revit_files_are_recognized_with_conversion_guidance(tmp_path):
+    source = tmp_path / "modelo.rvt"
+    source.write_bytes(b"Revit placeholder")
+    result = DocumentScanner().scan(source)
+    assert result.status == "partial"
+    assert "IFC" in result.warnings[0]
+
+
+def test_dwg_without_oda_converter_is_reported_as_partial(tmp_path, monkeypatch):
+    source = tmp_path / "desenho.dwg"
+    source.write_bytes(b"DWG placeholder")
+    monkeypatch.setattr("app.documents.scanner.shutil.which", lambda _name: None)
+    result = DocumentScanner().scan(source)
+    assert result.status == "partial"
+    assert "ODA" in result.warnings[0]
+
+
+def test_rejects_highly_compressed_office_archive(tmp_path):
+    import zipfile
+    source = tmp_path / "suspicious.docx"
+    with zipfile.ZipFile(source, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("word/document.xml", "A" * (2 * 1024 * 1024))
+    result = DocumentScanner().scan(source)
+    assert result.status == "error"
+    assert "compressão suspeita" in result.errors[0]
