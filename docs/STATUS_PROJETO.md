@@ -20,7 +20,8 @@
 
 - [ ] Executar CI atualizado e corrigir falhas encontradas.
 - [x] Scanner integrado à interface gráfica.
-- [x] Processamento de múltiplos arquivos e varredura recursiva via API do scanner; seleção de pastas e cancelamento ainda pendentes.
+- [x] Processamento de múltiplos arquivos e varredura recursiva de pastas pela interface.
+- [ ] Progresso detalhado por arquivo e cancelamento seguro de uma varredura em andamento.
 - [ ] OCR de PDF digitalizado com posição e confiança por trecho (a extração textual OCR inicial existe, coordenadas/confiança ainda pendentes).
 - [ ] Extração aprofundada de gráficos, imagens, cotas, blocos CAD e geometria BIM.
 - [ ] Leitura direta de DWG e RVT ou conversão confiável desses formatos.
