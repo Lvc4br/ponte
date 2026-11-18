@@ -71,7 +71,7 @@ def test_formula_engine_supports_math_and_functions():
     engine = FormulaEngine()
     assert engine.evaluate("=Quantidade * Preco", {"Quantidade": 3, "Preco": 2.5}) == 7.5
     assert engine.evaluate("SUM([1, 2, 3])") == 6
-    assert engine.evaluate("IF(Valor > 10, ROUND(Valor / 3, 2), 0)", {"Valor": 12}) == 4
+    assert engine.evaluate("IF(Valor > 10, ROUND(Valor / 3, 2), 1 / 0)", {"Valor": 12}) == 4
 
 
 def test_formula_engine_rejects_code_execution():
@@ -196,7 +196,7 @@ def test_calculated_columns_evaluate_dependencies_and_filter(tmp_path):
         store.update_record(records[0]["id"], {"Total": 99})
 
 
-def test_formula_columns_reject_unknown_and_circular_dependencies(tmp_path):
+def test_formula_columns_reject_unknown_references_and_protect_dependencies(tmp_path):
     store, project = build_store(tmp_path)
     table = store.create_table(project, "Dados")
     store.add_column(table, "A", "decimal")
