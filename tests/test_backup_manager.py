@@ -68,3 +68,35 @@ def test_invalid_restore_does_not_change_active_database(tmp_path):
     with pytest.raises(BackupError):
         DatabaseBackupManager(active).restore(invalid)
     assert read_value(active) == "original"
+
+
+def test_backup_and_restore_preserve_workspace_and_document_catalog(tmp_path):
+    from app.documents.index import DocumentIndex
+    from app.documents.scanner import DocumentScanner
+    from app.workspace.store import WorkspaceStore
+
+    database = tmp_path / "complete.sqlite3"
+    from app.data.dataset_store import DatasetStore
+    DatasetStore(database)
+    index = DocumentIndex(database)
+    workspace = WorkspaceStore(database)
+    project = workspace.create_project("Projeto de teste")
+    table = workspace.create_table(project, "Medições")
+    workspace.add_column(table, "Valor", "integer")
+    workspace.insert_record(table, {"Valor": 10})
+    source = tmp_path / "memorial.txt"
+    source.write_text("Documento associado", encoding="utf-8")
+    document_id = index.index_result(DocumentScanner().scan(source))
+    workspace.link_document(project, document_id)
+
+    manager = DatabaseBackupManager(database)
+    backup = tmp_path / "complete-backup.sqlite3"
+    manager.create_backup(backup)
+    workspace.update_record(
+        workspace.list_records(table)[0]["id"], {"Valor": 99}
+    )
+    manager.restore(backup)
+
+    restored_workspace = WorkspaceStore(database)
+    assert restored_workspace.list_records(table)[0]["values"]["Valor"] == 10
+    assert restored_workspace.list_project_documents(project)[0]["file_name"] == "memorial.txt"
