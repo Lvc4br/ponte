@@ -149,7 +149,7 @@ def test_invalid_pdf_is_reported_as_error_without_stopping_batch(tmp_path):
     folder = tmp_path / "lote"
     folder.mkdir()
     (folder / "a.txt").write_text("válido", encoding="utf-8")
-    (folder / "b.pdf").write_bytes(b"arquivo PDF inválido")
+    (folder / "b.pdf").write_bytes(b"invalid PDF file")
 
     results = DocumentScanner().scan_many([folder])
 
