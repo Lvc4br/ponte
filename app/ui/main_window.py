@@ -658,7 +658,8 @@ class MainWindow(QMainWindow):
         self.last_document_scan_results = results
         try:
             for result in results:
-                self.document_index.index_result(result)
+                if result.sha256:
+                    self.document_index.index_result(result)
         except Exception as exc:
             QMessageBox.warning(
                 self, "Catálogo documental",
