@@ -359,9 +359,13 @@ class DocumentScanner:
                 "image_width": image.width, "image_height": image.height,
                 "image_mode": image.mode,
             })
-            result.sections.append(ExtractedSection(
-                "ocr_text", "image:1", pytesseract.image_to_string(image)
-            ))
+            try:
+                text = pytesseract.image_to_string(image)
+                result.sections.append(ExtractedSection("ocr_text", "image:1", text))
+            except Exception as exc:
+                result.warnings.append(
+                    f"OCR indisponível nesta máquina; verifique o Tesseract: {exc}"
+                )
 
     @staticmethod
     def _dxf(path: Path, result: DocumentScanResult) -> None:
