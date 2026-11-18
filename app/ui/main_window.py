@@ -34,62 +34,89 @@ RATE_LABELS = {
 }
 
 APP_STYLE = """
-QMainWindow, QWidget#workspace { background: #202328; color: #e5e7eb; }
-QFrame#topbar, QFrame#sidebar, QFrame#properties, QFrame#panel {
-    background: #2a2e35; border: 1px solid #383e47; border-radius: 6px;
+* { font-family: "Segoe UI"; }
+QMainWindow, QWidget#workspace { background: #11151c; color: #e8edf5; }
+QFrame#topbar {
+    background: #191f29; border: 1px solid #293342; border-radius: 12px;
 }
-QLabel { color: #d8dce2; }
-QLabel#brand { color: #f1a34a; font-size: 17px; font-weight: 800; letter-spacing: 1px; }
-QLabel#pageTitle { color: #f4f5f7; font-size: 23px; font-weight: 700; }
-QLabel#muted { line-height: 1.25; }
-QPushButton { min-height: 18px; }
-QPushButton#nav { min-height: 20px; }
-QLabel#muted { color: #9ba3af; }
-QLabel#sectionTitle { color: #f0a34a; font-size: 11px; font-weight: 800; }
+QFrame#sidebar, QFrame#properties {
+    background: #171d27; border: 1px solid #293342; border-radius: 12px;
+}
+QFrame#panel {
+    background: #1b2330; border: 1px solid #2b3748; border-radius: 10px;
+}
+QLabel { color: #dce4ef; }
+QLabel#brand { color: #f5a94f; font-size: 19px; font-weight: 800; letter-spacing: 2px; }
+QLabel#pageTitle { color: #f4f7fb; font-size: 26px; font-weight: 750; }
+QLabel#muted { color: #8794a7; }
+QLabel#sectionTitle { color: #e9a34b; font-size: 10px; font-weight: 800; letter-spacing: 1.2px; }
 QLineEdit {
-    background: #1d2025; color: #f0f2f5; border: 1px solid #454c57;
-    border-radius: 4px; padding: 7px; selection-background-color: #bd762f;
+    background: #101720; color: #edf2f8; border: 1px solid #344154;
+    border-radius: 7px; padding: 9px 10px; min-height: 18px;
+    selection-background-color: #a9672c;
 }
-QLineEdit:focus { border: 1px solid #e39a43; }
+QLineEdit:hover { border-color: #53647b; }
+QLineEdit:focus { border: 1px solid #e9a34b; background: #141d28; }
 QPushButton, QToolButton {
-    background: #383e47; color: #e8eaed; border: 1px solid #4a515c;
-    border-radius: 4px; padding: 7px 10px;
+    background: #253143; color: #e6edf7; border: 1px solid #35465d;
+    border-radius: 7px; padding: 9px 13px; min-height: 18px; font-weight: 600;
 }
-QPushButton:hover, QToolButton:hover { background: #454d58; border-color: #d58c3d; }
-QPushButton#primary { background: #b96f2d; color: #fff; border: 1px solid #d48b43; font-weight: 700; }
-QPushButton#primary:hover { background: #d08337; }
-QPushButton#nav { text-align: left; padding: 10px; background: transparent; border: 0; }
-QPushButton#nav:checked { background: #414751; color: #f4b15f; border-left: 3px solid #e49a43; }
-QTabWidget::pane { border: 1px solid #3b424c; background: #25292f; }
+QPushButton:hover, QToolButton:hover { background: #304158; border-color: #d99543; }
+QPushButton:pressed, QToolButton:pressed { background: #1c2838; }
+QPushButton#primary {
+    background: #d88b3d; color: #171b22; border: 1px solid #e9a34b;
+    font-weight: 800;
+}
+QPushButton#primary:hover { background: #f0a64e; }
+QPushButton#nav {
+    text-align: left; padding: 11px 13px; background: transparent;
+    border: 1px solid transparent; border-radius: 8px; min-height: 22px;
+}
+QPushButton#nav:hover { background: #222d3c; border-color: #303e51; }
+QPushButton#nav:checked {
+    background: #2b3544; color: #ffc16e; border: 1px solid #46536a;
+}
+QTabWidget::pane {
+    border: 1px solid #2b3748; border-radius: 9px; background: #171e29;
+    top: -1px;
+}
 QTabBar::tab {
-    background: #2c3138; color: #aeb5bf; padding: 9px 16px;
-    border: 1px solid #3a414b; border-bottom: 0; margin-right: 2px;
+    background: #1d2735; color: #9eacbf; padding: 11px 18px;
+    border: 1px solid #2b3748; border-bottom: 0; margin-right: 4px;
+    border-top-left-radius: 7px; border-top-right-radius: 7px;
 }
-QTabBar::tab:selected { background: #25292f; color: #f2ae5b; border-top: 2px solid #e49a43; }
-QTabBar#datasetTabs { background: #25292f; }
-QTabBar#datasetTabs::tab { padding: 8px 14px; min-width: 90px; }
-QTabBar#datasetTabs::tab:selected { background: #343a43; }
-QTableWidget::item { padding: 3px 5px; }
-QTableWidget::item:selected { background: #59432f; }
+QTabBar::tab:hover { color: #eef3fa; background: #263448; }
+QTabBar::tab:selected {
+    background: #202b3a; color: #ffc16e; border-top: 2px solid #e9a34b;
+}
+QTabBar#datasetTabs { background: transparent; }
+QTabBar#datasetTabs::tab { padding: 9px 15px; min-width: 90px; }
+QTabBar#datasetTabs::tab:selected { background: #2a3545; }
 QTableWidget {
-    background: #22262c; alternate-background-color: #292e35;
-    color: #e1e5e9; gridline-color: #3b424c;
-    border: 1px solid #3b424c; selection-background-color: #57432f;
-    selection-color: #fff3e3;
+    background: #151c26; alternate-background-color: #1a2330;
+    color: #dce5f0; gridline-color: #273446;
+    border: 1px solid #2c394b; border-radius: 7px;
+    selection-background-color: #59452f; selection-color: #fff4e4;
 }
+QTableWidget::item { padding: 7px 8px; border: 0; }
+QTableWidget::item:hover { background: #222f40; }
+QTableWidget::item:selected { background: #59452f; }
 QHeaderView::section {
-    background: #343a43; color: #e6e9ed; padding: 7px;
-    border: 0; border-right: 1px solid #464d58; border-bottom: 1px solid #4b535e;
-    font-weight: 700;
+    background: #222d3c; color: #cbd6e4; padding: 11px 9px;
+    border: 0; border-right: 1px solid #303e51; border-bottom: 1px solid #39485d;
+    font-weight: 750;
 }
-QTableCornerButton::section { background: #343a43; border: 0; }
-QScrollBar:vertical { background: #25292f; width: 12px; margin: 0; }
-QScrollBar::handle:vertical { background: #505864; min-height: 24px; border-radius: 5px; }
-QScrollBar:horizontal { background: #25292f; height: 12px; margin: 0; }
-QScrollBar::handle:horizontal { background: #505864; min-width: 24px; border-radius: 5px; }
-QStatusBar { background: #191c20; color: #aeb5bf; border-top: 1px solid #3b424c; }
-QMenu { background: #2b3037; color: #e5e7eb; border: 1px solid #454c57; }
-QMenu::item:selected { background: #57432f; }
+QTableCornerButton::section { background: #222d3c; border: 0; }
+QScrollBar:vertical { background: #171e29; width: 12px; margin: 2px; }
+QScrollBar::handle:vertical { background: #3c4b60; min-height: 28px; border-radius: 5px; }
+QScrollBar::handle:vertical:hover { background: #596b83; }
+QScrollBar:horizontal { background: #171e29; height: 12px; margin: 2px; }
+QScrollBar::handle:horizontal { background: #3c4b60; min-width: 28px; border-radius: 5px; }
+QStatusBar { background: #10151d; color: #9eacbf; border-top: 1px solid #293648; }
+QMenu { background: #1d2735; color: #e5edf7; border: 1px solid #3a4960; padding: 5px; }
+QMenu::item { padding: 8px 24px; border-radius: 5px; }
+QMenu::item:selected { background: #35445a; color: #ffc16e; }
+QToolTip { background: #263448; color: #f4f7fb; border: 1px solid #53647b; padding: 5px; }
 """
 
 
@@ -149,13 +176,13 @@ class MainWindow(QMainWindow):
         workspace = QWidget()
         workspace.setObjectName("workspace")
         root = QVBoxLayout(workspace)
-        root.setContentsMargins(10, 10, 10, 6)
-        root.setSpacing(8)
+        root.setContentsMargins(16, 14, 16, 10)
+        root.setSpacing(12)
 
         topbar = QFrame()
         topbar.setObjectName("topbar")
         top = QHBoxLayout(topbar)
-        top.setContentsMargins(14, 8, 14, 8)
+        top.setContentsMargins(18, 12, 18, 12)
         brand = QLabel("PONTE")
         brand.setObjectName("brand")
         top.addWidget(brand)
@@ -196,11 +223,11 @@ class MainWindow(QMainWindow):
 
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setMinimumWidth(175)
-        sidebar.setMaximumWidth(205)
+        sidebar.setMinimumWidth(210)
+        sidebar.setMaximumWidth(245)
         side = QVBoxLayout(sidebar)
-        side.setContentsMargins(10, 14, 10, 12)
-        side.setSpacing(7)
+        side.setContentsMargins(14, 18, 14, 16)
+        side.setSpacing(9)
         section = QLabel("NAVEGAÇÃO")
         section.setObjectName("sectionTitle")
         side.addWidget(section)
@@ -270,8 +297,8 @@ class MainWindow(QMainWindow):
 
         center = QWidget()
         center_layout = QVBoxLayout(center)
-        center_layout.setContentsMargins(4, 0, 4, 0)
-        center_layout.setSpacing(10)
+        center_layout.setContentsMargins(4, 2, 4, 2)
+        center_layout.setSpacing(14)
 
         page_header = QVBoxLayout()
         page_header.setSpacing(10)
@@ -342,7 +369,7 @@ class MainWindow(QMainWindow):
         self.table.setWordWrap(False)
         self.table.setShowGrid(True)
         self.table.verticalHeader().setVisible(True)
-        self.table.verticalHeader().setDefaultSectionSize(27)
+        self.table.verticalHeader().setDefaultSectionSize(36)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.horizontalHeader().setDefaultSectionSize(125)
@@ -395,10 +422,10 @@ class MainWindow(QMainWindow):
 
         properties = QFrame()
         properties.setObjectName("properties")
-        properties.setMinimumWidth(205)
-        properties.setMaximumWidth(255)
+        properties.setMinimumWidth(235)
+        properties.setMaximumWidth(295)
         props = QVBoxLayout(properties)
-        props.setContentsMargins(12, 14, 12, 12)
+        props.setContentsMargins(16, 18, 16, 16)
         props.setSpacing(8)
         props_title = QLabel("PROPRIEDADES")
         props_title.setObjectName("sectionTitle")
@@ -423,7 +450,7 @@ class MainWindow(QMainWindow):
         body.setStretchFactor(0, 0)
         body.setStretchFactor(1, 1)
         body.setStretchFactor(2, 0)
-        body.setSizes([185, 850, 225])
+        body.setSizes([225, 900, 265])
         root.addWidget(body, 1)
 
         self.setCentralWidget(workspace)
