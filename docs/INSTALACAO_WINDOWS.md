@@ -8,7 +8,7 @@ O executável é `PONTE.exe`. Extraia o pacote em uma pasta com permissão de gr
 
 ## Dependências externas opcionais do scanner
 
-- **Tesseract OCR:** necessário para OCR de páginas PDF digitalizadas e imagens. Instale o Tesseract no Windows e inclua os idiomas português e inglês.
+- **Tesseract OCR:** o pipeline Windows tenta incluir o executável e o idioma português no pacote. Se o pacote não contiver Tesseract, instale-o no Windows e inclua os idiomas português e inglês. Builds locais copiam a instalação encontrada em Program Files.
 - **LibreOffice:** necessário para ler DOC/PPT/RTF/ODT/ODP legados por conversão local.
 - **ODA File Converter:** necessário para conversão DWG para DXF.
 - **IfcOpenShell:** necessário para extração IFC avançada; depende de versão compatível com o Python usado no ambiente.
