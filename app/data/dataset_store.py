@@ -24,6 +24,11 @@ class DatasetStore:
                 )
                 """
             )
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(records)")}
+            if "source_file" not in columns:
+                connection.execute("ALTER TABLE records ADD COLUMN source_file TEXT")
+            if "source_sheet" not in columns:
+                connection.execute("ALTER TABLE records ADD COLUMN source_sheet TEXT")
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS imported_excel_files (
@@ -42,11 +47,11 @@ class DatasetStore:
     def load(self):
         with sqlite3.connect(self.path) as connection:
             rows = connection.execute(
-                "SELECT id, payload FROM records ORDER BY id"
+                "SELECT id, payload, source_file, source_sheet FROM records ORDER BY id"
             ).fetchall()
         return [
-            BridgeRecord(json.loads(payload), row_id)
-            for row_id, payload in rows
+            BridgeRecord(json.loads(payload), row_id, source_file, source_sheet)
+            for row_id, payload, source_file, source_sheet in rows
         ]
 
     def initialize_if_empty(self, records):
@@ -64,7 +69,8 @@ class DatasetStore:
             return 0
         with sqlite3.connect(self.path) as connection:
             connection.executemany(
-                "INSERT INTO records(payload) VALUES (?)", prepared
+                """INSERT INTO records(payload, source_file, source_sheet) VALUES (?, ?, ?)""",
+                    [(payload, file_name, sheet_name) for (payload,) in prepared]
             )
         return len(prepared)
 
@@ -77,7 +83,7 @@ class DatasetStore:
             ).fetchone()
         return row is not None
 
-    def append_imported_file(self, sha256, file_name, records):
+    def append_imported_file(self, sha256, file_name, sheet_name, records):
         """Atomically append records and register the source file fingerprint."""
         prepared = [
             (json.dumps(record.values, ensure_ascii=False, default=str),)
