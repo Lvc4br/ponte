@@ -16,7 +16,7 @@
 - [x] Interface inicial para projetos, tabelas, edição de células e colunas calculadas.
 - [x] Importação/exportação inicial de CSV e XLSX/XLSM.
 - [x] Migração aditiva do workspace SQLite v1 para v2.
-- [x] Associação de documentos do catálogo a projetos no backend.
+- [x] Associação de documentos do catálogo a projetos no backend.\n- [x] Backup SQLite consistente, manifesto SHA-256, verificação e restauração com cópia de segurança.\n- [x] Ações de backup/restauração na interface.\n- [x] Plano detalhado de testes de usuário e regressão.
 - [x] Scanner recursivo, catálogo documental e biblioteca integrada à interface.
 - [x] Leitores iniciais de PDF, DOC/DOCX, PPT/PPTX, RTF, ODT/ODP, XLS/XLSX/XLSM/XLSB, CSV/TXT/MD/JSON/XML, imagens, DXF, DWG opcional, IFC opcional e reconhecimento RVT/RFA.
 - [x] Proteção inicial contra arquivos Office compactados suspeitos.
@@ -28,7 +28,7 @@
 - [ ] Build Windows e smoke test do executável.
 - [ ] Compatibilidade do PyInstaller com todos os leitores e plugins Qt.
 - [ ] Execução em Windows limpo sem Python instalado.
-- [ ] Backup/restauração do banco completo e validação de integridade.
+- [ ] Testes de backup/restauração com banco real de cópia e confirmação de preservação dos registros legados.
 - [ ] Testes com arquivos reais de DOC/DOCX/PDF/XLS/XLSX/PPT/PPTX/DWG/IFC/RVT autorizados.
 - [ ] OCR com Tesseract e idiomas português/inglês.
 - [ ] Conversão DOC/PPT/RTF/ODT/ODP com LibreOffice.
@@ -37,7 +37,7 @@
 - [ ] Progresso por arquivo, cancelamento seguro e relatório exportável.
 - [ ] UX de edição em lote, copiar/colar, desfazer/refazer e filtros visuais.
 - [ ] Revisão de segurança, desempenho, acessibilidade e usabilidade.
-- [ ] Testes de usuário antes de considerar substituição de planilhas complexas.
+- [ ] Executar o [plano de testes de usuário](PLANO_TESTES_USUARIO.md) antes de considerar substituição de planilhas complexas.
 
 ## Limitações conhecidas
 
