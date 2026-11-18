@@ -4,6 +4,8 @@
 
 ### Adicionado
 - Importação aditiva de registros de planilhas Excel no formato .xlsx.
+- Bloqueio de reimportação do mesmo arquivo Excel por impressão digital SHA-256, inclusive quando renomeado.
+- Registro persistente dos arquivos importados no SQLite local, com inclusão dos registros e do histórico na mesma transação.
 - Seleção de aba e prévia antes da confirmação da importação.
 - Persistência local independente da fonte SQL.
 - Exclusão de registros selecionados com confirmação e backup.
@@ -13,6 +15,7 @@
 - Filtros dimensionais que não consideram registros sem dados verificáveis como correspondências confirmadas.
 
 ### Corrigido e validado
+- Proteção contra duplicidade com testes de persistência após reabrir o banco e aceitação de arquivos distintos.
 - Correção do filtro de dimensões ausentes.
 - Correção da identificação de cabeçalhos equivalentes duplicados.
 - Testes locais no Windows: 40 aprovados.
