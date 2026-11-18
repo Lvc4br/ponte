@@ -15,7 +15,7 @@ O executável é `PONTE.exe`. Extraia o pacote em uma pasta com permissão de gr
 
 Sem essas ferramentas, os arquivos correspondentes são identificados e o scanner registra avisos; não significa que o conteúdo foi integralmente lido.
 
-## Dados locais
+## Backup e restauração\n\nUse as opções **Criar backup do banco**, **Verificar backup** e **Restaurar backup** no menu principal. O backup gera um arquivo SQLite e um manifesto JSON. A restauração verifica o arquivo e cria uma cópia de segurança do banco atual antes de substituí-lo. Feche e reabra o aplicativo após restaurar.\n\nConsulte [Plano de testes de usuário](PLANO_TESTES_USUARIO.md) antes de validar a versão atualizada.\n\n## Dados locais
 
 - `data/registros.sqlite3`: banco ativo do aplicativo, incluindo dados legados, catálogo documental e workspace genérico.
 - `data/ponte.db`: base SQLite intermediária criada ao executar o SQL legado.
