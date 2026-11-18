@@ -159,6 +159,85 @@ class SpreadsheetExchange:
         finally:
             workbook.close()
 
+    def import_xls(self, project_id: int, path: str | Path, *, sheet_name=None):
+        import xlrd
+
+        path = Path(path)
+        workbook = xlrd.open_workbook(str(path), on_demand=True)
+        created = []
+        try:
+            names = workbook.sheet_names()
+            if sheet_name is not None and sheet_name not in names:
+                raise KeyError(f"Aba não encontrada: {sheet_name}")
+            selected = [sheet_name] if sheet_name else names
+            try:
+                for name in selected:
+                    sheet = workbook.sheet_by_name(name)
+                    rows = []
+                    for row_index in range(sheet.nrows):
+                        row = []
+                        for cell in sheet.row(row_index):
+                            if cell.ctype == xlrd.XL_CELL_DATE:
+                                row.append(xlrd.xldate_as_datetime(cell.value, workbook.datemode).isoformat())
+                            elif cell.ctype == xlrd.XL_CELL_BOOLEAN:
+                                row.append(bool(cell.value))
+                            elif cell.ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK):
+                                row.append(None)
+                            else:
+                                row.append(cell.value)
+                        rows.append(row)
+                    if rows:
+                        created.append(self._create_from_rows(
+                            project_id, name, rows[0], rows[1:],
+                            f"Importado de {path.name}, aba {name}",
+                        ))
+                return created
+            except Exception:
+                for table_id in created:
+                    self.store.delete_table(table_id)
+                raise
+        finally:
+            workbook.release_resources()
+
+    def import_xlsb(self, project_id: int, path: str | Path, *, sheet_name=None):
+        from pyxlsb import open_workbook
+
+        path = Path(path)
+        created = []
+        with open_workbook(str(path)) as workbook:
+            if sheet_name is not None and sheet_name not in workbook.sheets:
+                raise KeyError(f"Aba não encontrada: {sheet_name}")
+            selected = [sheet_name] if sheet_name else list(workbook.sheets)
+            try:
+                for name in selected:
+                    with workbook.get_sheet(name) as sheet:
+                        rows = [[cell.v for cell in row] for row in sheet.rows()]
+                    if rows:
+                        created.append(self._create_from_rows(
+                            project_id, name, rows[0], rows[1:],
+                            f"Importado de {path.name}, aba {name}",
+                        ))
+                return created
+            except Exception:
+                for table_id in created:
+                    self.store.delete_table(table_id)
+                raise
+
+    def preview_xls(self, path: str | Path, *, limit=5):
+        import xlrd
+
+        path = Path(path)
+        workbook = xlrd.open_workbook(str(path), on_demand=True)
+        try:
+            previews = []
+            for name in workbook.sheet_names():
+                sheet = workbook.sheet_by_name(name)
+                rows = [sheet.row_values(index) for index in range(min(sheet.nrows, limit + 1))]
+                previews.append({"sheet_name": name, "rows": rows})
+            return {"file_name": path.name, "sheets": previews}
+        finally:
+            workbook.release_resources()
+
     def export_csv(self, table_id: int, path: str | Path):
         columns = self.store.list_columns(table_id)
         records = self.store.list_records(table_id)
