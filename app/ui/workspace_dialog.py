@@ -42,6 +42,7 @@ class WorkspaceDialog(QDialog):
         for label, callback in (
             ("Nova tabela", self._add_table),
             ("Nova coluna", self._add_column),
+            ("Coluna calculada", self._add_formula_column),
             ("Novo registro", self._add_record),
             ("Excluir registro", self._delete_record),
             ("Importar CSV", self._import_csv),
@@ -130,6 +131,9 @@ class WorkspaceDialog(QDialog):
                 value = record["values"].get(column["name"])
                 item = QTableWidgetItem("" if value is None else str(value))
                 item.setData(Qt.ItemDataRole.UserRole, column["name"])
+                if column.get("formula"):
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    item.setToolTip(f"Fórmula: {column['formula']}")
                 self.grid.setItem(row_index, column_index, item)
         self._loading = False
         self.status.setText(
@@ -179,6 +183,30 @@ class WorkspaceDialog(QDialog):
             self._refresh_grid()
         except Exception as exc:
             QMessageBox.warning(self, "Coluna", str(exc))
+
+    def _add_formula_column(self):
+        if self.table_id is None:
+            QMessageBox.information(self, "Fórmula", "Selecione uma tabela primeiro.")
+            return
+        name, ok = QInputDialog.getText(self, "Coluna calculada", "Nome da coluna:")
+        if not ok:
+            return
+        formula, ok = QInputDialog.getText(
+            self, "Fórmula", "Expressão (ex.: [Quantidade] * [Preço unitário]):"
+        )
+        if not ok:
+            return
+        data_type, ok = QInputDialog.getItem(
+            self, "Tipo do resultado", "Tipo:",
+            ["decimal", "integer", "text", "boolean", "date", "datetime", "json"], 0, False
+        )
+        if not ok:
+            return
+        try:
+            self.store.add_column(self.table_id, name, data_type, formula=formula)
+            self._refresh_grid()
+        except Exception as exc:
+            QMessageBox.warning(self, "Fórmula inválida", str(exc))
 
     def _add_record(self):
         if self.table_id is None or not self.columns:
