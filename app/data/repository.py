@@ -31,9 +31,9 @@ class SQLRepository:
         self.records = self.store.load()
         return count
 
-    def add_excel_records(self, records, file_sha256, file_name):
+    def add_excel_records(self, records, file_sha256, file_name, sheet_name):
         count = self.store.append_imported_file(
-            file_sha256, file_name, records
+            file_sha256, file_name, sheet_name, records
         )
         self.records = self.store.load()
         return count
