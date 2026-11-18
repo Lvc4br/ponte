@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QKeySequence, QPixmap
+from PySide6.QtGui import QCursor, QDesktopServices, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QApplication, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog, QDialog, QDialogButtonBox,
     QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton,
@@ -23,6 +23,7 @@ from app.documents.index import DocumentIndex
 from app.workspace.exchange import SpreadsheetExchange
 from app.workspace.store import WorkspaceStore
 from app.workspace.spreadsheet import matches_condition, parse_cell_value
+from app.workspace.technical_filters import matches_technical_filters, parse_filter_number
 
 
 STYLE = """
@@ -112,6 +113,7 @@ class SpreadsheetWindow(QMainWindow):
         self._history_limit = 500
         self._sort_column = None
         self._sort_descending = False
+        self._technical_criteria = {}
         self._legacy_window = None
         self._pdf_document = None
         self._pdf_page_index = 0
@@ -164,7 +166,6 @@ class SpreadsheetWindow(QMainWindow):
             ("＋ Coluna", self._new_column),
             ("＋ Registro", self._new_record),
             ("Coluna calculada", self._new_formula_column),
-            ("Limpar filtros", self._clear_filters),
             ("Desfazer", self._undo),
             ("Refazer", self._redo),
             ("Excluir linhas", self._delete_selected),
@@ -182,6 +183,43 @@ class SpreadsheetWindow(QMainWindow):
         actions.addStretch()
         ribbon_layout.addLayout(actions)
         layout.addWidget(ribbon)
+
+        filters_bar = QWidget()
+        filters_bar.setObjectName("filterBar")
+        filters_layout = QHBoxLayout(filters_bar)
+        filters_layout.setContentsMargins(10, 7, 10, 7)
+        filters_layout.setSpacing(7)
+        filters_title = QLabel("FILTROS TÉCNICOS")
+        filters_title.setObjectName("muted")
+        filters_layout.addWidget(filters_title)
+        self.type_filter_input = QLineEdit()
+        self.type_filter_input.setPlaceholderText("Tipo de obra")
+        self.type_filter_input.setMaximumWidth(150)
+        filters_layout.addWidget(self.type_filter_input)
+        self.technical_filter_inputs = {}
+        for key, label in [
+            ("width", "Largura (m)"),
+            ("span", "Vão (m)"),
+            ("length", "Comprimento (m)"),
+        ]:
+            filters_layout.addWidget(QLabel(label))
+            minimum = QLineEdit()
+            minimum.setPlaceholderText("Mín.")
+            minimum.setMaximumWidth(68)
+            maximum = QLineEdit()
+            maximum.setPlaceholderText("Máx.")
+            maximum.setMaximumWidth(68)
+            filters_layout.addWidget(minimum)
+            filters_layout.addWidget(maximum)
+            self.technical_filter_inputs[key] = (minimum, maximum)
+        apply_filters_button = QPushButton("Aplicar")
+        apply_filters_button.setObjectName("primary")
+        apply_filters_button.clicked.connect(self._apply_technical_filters)
+        filters_layout.addWidget(apply_filters_button)
+        clear_filters_button = QPushButton("Limpar")
+        clear_filters_button.clicked.connect(self._clear_filters)
+        filters_layout.addWidget(clear_filters_button)
+        layout.addWidget(filters_bar)
 
         formula_row = QHBoxLayout()
         self.name_box = QLabel("A1")
@@ -266,7 +304,7 @@ class SpreadsheetWindow(QMainWindow):
         self.status.setObjectName("muted")
         layout.addWidget(self.status)
         self.setCentralWidget(root)
-        self.setStyleSheet(STYLE)
+        self.setStyleSheet(STYLE + "\\nQWidget#filterBar { background:#293543; border:1px solid #3b4b5c; border-radius:4px; }")
         self.statusBar().showMessage("Banco local preservado · alterações salvas automaticamente")
 
     def _load_projects(self, selected=None):
@@ -306,6 +344,35 @@ class SpreadsheetWindow(QMainWindow):
         self._conditions.clear()
         self._refresh_grid()
 
+    def _technical_filter_criteria(self):
+        criteria = {}
+        requested_type = self.type_filter_input.text().strip()
+        if requested_type:
+            criteria["type_obra"] = requested_type
+        labels = {"width": "Largura", "span": "Vão", "length": "Comprimento total"}
+        for key, (minimum_input, maximum_input) in self.technical_filter_inputs.items():
+            minimum_raw, maximum_raw = minimum_input.text().strip(), maximum_input.text().strip()
+            minimum = parse_filter_number(minimum_raw) if minimum_raw else None
+            maximum = parse_filter_number(maximum_raw) if maximum_raw else None
+            if minimum_raw and minimum is None:
+                raise ValueError(f"{labels[key]}: informe um número válido para o mínimo.")
+            if maximum_raw and maximum is None:
+                raise ValueError(f"{labels[key]}: informe um número válido para o máximo.")
+            if minimum is not None and maximum is not None and minimum > maximum:
+                raise ValueError(f"{labels[key]}: o mínimo não pode ser maior que o máximo.")
+            if minimum is not None:
+                criteria[f"{key}_min" if key != "span" else "span_min"] = minimum
+            if maximum is not None:
+                criteria[f"{key}_max" if key != "span" else "span_max"] = maximum
+        return criteria
+
+    def _apply_technical_filters(self):
+        try:
+            self._technical_criteria = self._technical_filter_criteria()
+            self._refresh_grid()
+        except ValueError as exc:
+            QMessageBox.warning(self, "Filtros inválidos", str(exc))
+
     def _refresh_grid(self, *_):
         if self.table_id is None:
             self.columns, self._records = [], []
@@ -330,6 +397,8 @@ class SpreadsheetWindow(QMainWindow):
                 records = [record for record in records if str(record["values"].get(name, "")) in allowed]
             for name, (operator, target) in self._conditions.items():
                 records = [record for record in records if self._matches_condition(record["values"].get(name), operator, target)]
+            if self._technical_criteria:
+                records = [record for record in records if matches_technical_filters(record["values"], self._technical_criteria)]
             if self._sort_column:
                 sort_column = next((c for c in self.columns if c["name"] == self._sort_column), None)
                 numeric = bool(sort_column and sort_column["data_type"] in {"integer", "decimal"})
@@ -364,7 +433,7 @@ class SpreadsheetWindow(QMainWindow):
                         item.setToolTip(f"Coluna calculada · {column['formula']}")
                     self.grid.setItem(row, col, item)
             self._loading = False
-            active = len(self._filters) + len(self._conditions)
+            active = len(self._filters) + len(self._conditions) + len(self._technical_criteria)
             self.status.setText(
                 f"{len(records)} de {total_records} registros · "
                 f"{len(self.columns)} colunas · {active} filtro(s) ativo(s) · "
@@ -400,9 +469,7 @@ class SpreadsheetWindow(QMainWindow):
             action.setCheckable(True)
             action.setChecked(value in selected)
             value_actions[action] = value
-        chosen = menu.exec(self.grid.horizontalHeader().mapToGlobal(
-            self.grid.horizontalHeader().rect().bottomLeft()
-        ))
+        chosen = menu.exec(QCursor.pos())
         if chosen == sort_asc:
             self._sort_column, self._sort_descending = name, False
         elif chosen == sort_desc:
@@ -410,9 +477,12 @@ class SpreadsheetWindow(QMainWindow):
         elif chosen == search_action:
             text, ok = QInputDialog.getText(self, "Pesquisar filtro", f"Valor em “{name}” contém:")
             if ok:
-                self._filters[name] = {
-                    value for value in values if text.casefold() in value.casefold()
-                }
+                if text.strip():
+                    self._filters[name] = {
+                        value for value in values if text.casefold() in value.casefold()
+                    }
+                else:
+                    self._filters.pop(name, None)
                 self._conditions.pop(name, None)
         elif chosen == condition_action:
             self._set_column_condition(column)
@@ -433,7 +503,6 @@ class SpreadsheetWindow(QMainWindow):
                 self._filters.pop(name, None)
             else:
                 self._filters[name] = new_selected
-            self._conditions.pop(name, None)
             self._conditions.pop(name, None)
         else:
             return
@@ -710,6 +779,11 @@ class SpreadsheetWindow(QMainWindow):
     def _clear_filters(self):
         self._filters.clear()
         self._conditions.clear()
+        self._technical_criteria.clear()
+        self.type_filter_input.clear()
+        for minimum, maximum in self.technical_filter_inputs.values():
+            minimum.clear()
+            maximum.clear()
         self.search_input.clear()
         self._sort_column = None
         self._sort_descending = False
