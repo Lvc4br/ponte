@@ -519,7 +519,7 @@ class MainWindow(QMainWindow):
             return
         self.scan_progress = QProgressDialog(
             "Analisando documentos localmente. Arquivos grandes podem levar algum tempo...",
-            None, 0, 0, self,
+            "", 0, 0, self,
         )
         self.scan_progress.setWindowTitle("Análise documental")
         self.scan_progress.setWindowModality(Qt.WindowModality.WindowModal)
