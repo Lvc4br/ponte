@@ -1,5 +1,6 @@
 from pathlib import Path
 import hashlib
+import threading
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
@@ -106,13 +107,22 @@ def _pt_number(value):
 
 class DocumentScanWorker(QThread):
     completed = Signal(object)
+    progress = Signal(int, int, str)
 
     def __init__(self, paths, parent=None):
         super().__init__(parent)
         self.paths = paths
+        self.cancel_event = threading.Event()
+
+    def cancel(self):
+        self.cancel_event.set()
 
     def run(self):
-        results = DocumentScanner().scan_many(self.paths)
+        results = DocumentScanner().scan_many(
+            self.paths,
+            progress_callback=self.progress.emit,
+            cancel_event=self.cancel_event,
+        )
         self.completed.emit(results)
 
 
@@ -611,19 +621,31 @@ class MainWindow(QMainWindow):
 
     def _start_document_scan(self, paths):
         self.scan_progress = QProgressDialog(
-            "Analisando documentos localmente. Arquivos grandes podem levar algum tempo...",
-            "", 0, 0, self,
+            "Preparando a análise documental...",
+            "Cancelar", 0, 0, self,
         )
         self.scan_progress.setWindowTitle("Análise documental")
         self.scan_progress.setWindowModality(Qt.WindowModality.WindowModal)
         self.scan_progress.setMinimumDuration(0)
-        self.scan_progress.setCancelButton(None)
         self.scan_progress.show()
         self.scan_worker = DocumentScanWorker(paths, self)
+        self.scan_worker.progress.connect(self._update_document_progress)
         self.scan_worker.completed.connect(self._show_document_scan_results)
+        self.scan_progress.canceled.connect(self.scan_worker.cancel)
         self.scan_worker.start()
 
+    def _update_document_progress(self, current, total, file_name):
+        if total:
+            self.scan_progress.setRange(0, total)
+            self.scan_progress.setValue(current)
+            self.scan_progress.setLabelText(
+                f"Analisando {file_name or 'documentos'} ({current}/{total})"
+            )
+        else:
+            self.scan_progress.setLabelText("Nenhum arquivo encontrado na seleção.")
+
     def _show_document_scan_results(self, results):
+        cancelled = self.scan_worker.cancel_event.is_set()
         self.scan_progress.close()
         self.last_document_scan_results = results
         try:
@@ -636,8 +658,9 @@ class MainWindow(QMainWindow):
             )
         dialog = DocumentScanDialog(results, self)
         dialog.exec()
+        state = "cancelada" if cancelled else "concluída"
         self.statusBar().showMessage(
-            f"Análise documental concluída: {len(results)} arquivo(s) processado(s)."
+            f"Análise {state}: {len(results)} arquivo(s) processado(s)."
         )
 
     def import_excel(self):
