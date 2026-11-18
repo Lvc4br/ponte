@@ -8,7 +8,10 @@ from app.workspace.store import WorkspaceStore
 
 
 def build_store(tmp_path):
-    store = WorkspaceStore(tmp_path / "workspace.sqlite3")
+    from app.documents.index import DocumentIndex
+    database = tmp_path / "workspace.sqlite3"
+    DocumentIndex(database)
+    store = WorkspaceStore(database)
     project = store.create_project("Projeto genérico")
     return store, project
 
@@ -246,7 +249,9 @@ def test_exports_text_as_text_to_prevent_spreadsheet_formula_injection(tmp_path)
     exchange = SpreadsheetExchange(store)
     exchange.export_csv(table, csv_path)
     exchange.export_xlsx(table, xlsx_path)
-    assert csv_path.read_text(encoding="utf-8-sig").splitlines()[1].startswith("'=")
+    with csv_path.open(encoding="utf-8-sig", newline="") as stream:
+        exported_csv = list(csv.reader(stream))
+    assert exported_csv[1][0].startswith("'=")
     workbook = load_workbook(xlsx_path, data_only=False)
     cell = workbook.active["A2"]
     assert cell.data_type == "s"
