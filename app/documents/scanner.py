@@ -145,9 +145,34 @@ class DocumentScanner:
             text = page.extract_text() or ""
             result.sections.append(ExtractedSection("page_text", f"page:{index}", text))
             if not text.strip():
-                result.warnings.append(
-                    f"Página {index} sem texto extraível; pode exigir OCR."
-                )
+                ocr_text, warning = DocumentScanner._ocr_pdf_page(path, index - 1)
+                if ocr_text:
+                    result.sections.append(ExtractedSection(
+                        "ocr_text", f"page:{index}:ocr", ocr_text
+                    ))
+                if warning:
+                    result.warnings.append(f"Página {index}: {warning}")
+                elif not ocr_text:
+                    result.warnings.append(f"Página {index} sem texto reconhecido por OCR.")
+
+    @staticmethod
+    def _ocr_pdf_page(path: Path, page_index: int) -> tuple[str, str | None]:
+        try:
+            import pypdfium2 as pdfium
+            import pytesseract
+        except ImportError:
+            return "", "OCR indisponível; instale pypdfium2, Pillow, pytesseract e Tesseract."
+        document = None
+        try:
+            document = pdfium.PdfDocument(str(path))
+            page = document[page_index]
+            image = page.render(scale=2).to_pil()
+            return pytesseract.image_to_string(image), None
+        except Exception as exc:
+            return "", f"falha no OCR ({exc})."
+        finally:
+            if document is not None:
+                document.close()
 
     @staticmethod
     def _docx(path: Path, result: DocumentScanResult) -> None:
