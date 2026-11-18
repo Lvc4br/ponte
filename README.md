@@ -18,7 +18,7 @@ O objetivo é substituir uma parcela relevante dos fluxos de planilhas com tabel
 - Interface desktop para criar projetos/tabelas/colunas/registros, editar células e importar/exportar CSV e Excel.
 - Persistência SQLite com migração aditiva versionada, sem reescrever a tabela legada de pontes.
 
-### Scanner e biblioteca documental
+### Backup e recuperação\n- Backup SQLite consistente por API nativa, manifesto JSON com SHA-256 e verificação de integridade.\n- Restauração validada com criação automática de backup de segurança antes de substituir o banco ativo.\n- Ações de backup, verificação e restauração disponíveis no menu principal.\n\n### Scanner e biblioteca documental
 - SHA-256, tamanho, MIME, metadados, seções extraídas, avisos e erros por arquivo.
 - Seleção de vários arquivos ou varredura recursiva de pasta.
 - Processamento em thread separada e visualização dos resultados.
@@ -51,7 +51,7 @@ O objetivo é substituir uma parcela relevante dos fluxos de planilhas com tabel
 
 ## Arquitetura
 
-Consulte [docs/ARQUITETURA_GERENCIADOR_UNIVERSAL.md](docs/ARQUITETURA_GERENCIADOR_UNIVERSAL.md) e [docs/STATUS_PROJETO.md](docs/STATUS_PROJETO.md).
+Consulte [docs/ARQUITETURA_GERENCIADOR_UNIVERSAL.md](docs/ARQUITETURA_GERENCIADOR_UNIVERSAL.md), [docs/STATUS_PROJETO.md](docs/STATUS_PROJETO.md) e o [plano de testes de usuário](docs/PLANO_TESTES_USUARIO.md).
 
 ## Instalação e execução
 
