@@ -70,7 +70,7 @@ def test_project_deletion_cascades_only_workspace_data(tmp_path):
 def test_formula_engine_supports_math_and_functions():
     engine = FormulaEngine()
     assert engine.evaluate("=Quantidade * Preco", {"Quantidade": 3, "Preco": 2.5}) == 7.5
-    assert engine.evaluate("SUM([1, 2, 3])") == 6
+    assert engine.evaluate("SUM((1, 2, 3))") == 6
     assert engine.evaluate("IF(Valor > 10, ROUND(Valor / 3, 2), 1 / 0)", {"Valor": 12}) == 4
 
 
@@ -222,3 +222,14 @@ def test_workspace_schema_v1_migrates_additively_to_v2(tmp_path):
     migrated = WorkspaceStore(path)
     assert migrated.list_records(table)[0]["values"]["Valor"] == "mantido"
     assert migrated.list_columns(table)[0]["formula"] is None
+
+
+def test_formula_supports_column_names_with_spaces(tmp_path):
+    store, project = build_store(tmp_path)
+    table = store.create_table(project, "Itens")
+    store.add_column(table, "Preço unitário", "decimal")
+    store.add_column(table, "Quantidade", "integer")
+    store.insert_record(table, {"Preço unitário": 4.5, "Quantidade": 8})
+    store.add_column(table, "Total calculado", "decimal",
+                     formula="[Preço unitário] * [Quantidade]")
+    assert store.list_records(table)[0]["values"]["Total calculado"] == 36
