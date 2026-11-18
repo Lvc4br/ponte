@@ -411,6 +411,17 @@ class WorkspaceDialog(QDialog):
         if not path:
             return
         try:
+            preview = self.exchange.preview_csv(path, limit=5)
+            sample = "\\n".join(" | ".join(str(value) for value in row) for row in preview["rows"])
+            answer = QMessageBox.question(
+                self, "Prévia do CSV",
+                f"Arquivo: {preview['file_name']}\\nSeparador: {preview['delimiter']!r}\\n\\n"
+                f"{sample}\\n\\nImportar este conteúdo como uma nova tabela?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
             table_id = self.exchange.import_csv(self.project_id, path)
             self._project_changed(self.projects.currentIndex())
             self.tables.setCurrentIndex(self.tables.findData(table_id))
@@ -424,6 +435,24 @@ class WorkspaceDialog(QDialog):
         if not path:
             return
         try:
+            preview = self.exchange.preview_xlsx(path, limit=4)
+            summary = []
+            for sheet in preview["sheets"]:
+                rows = "\\n".join(
+                    " | ".join(str(value) for value in row)
+                    for row in sheet["rows"]
+                )
+                summary.append(f"Aba: {sheet['sheet_name']}\\n{rows}")
+            answer = QMessageBox.question(
+                self, "Prévia do Excel",
+                f"Arquivo: {preview['file_name']}\\n\\n" +
+                "\\n\\n".join(summary) +
+                "\\n\\nImportar todas as abas como tabelas deste projeto?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
             table_ids = self.exchange.import_xlsx(self.project_id, path)
             self._project_changed(self.projects.currentIndex())
             if table_ids:
