@@ -160,12 +160,12 @@ class DocumentScanner:
             "page_count": len(reader.pages),
             "document_info": {str(k): str(v) for k, v in (reader.metadata or {}).items()},
             "encrypted": bool(reader.is_encrypted),
-            "form_fields": reader.get_fields() or {},
-            "attachments": sorted((reader.attachments or {}).keys()),
         })
         if reader.is_encrypted:
             result.warnings.append("PDF protegido por senha; conteúdo não extraído.")
             return
+        result.metadata["form_fields"] = reader.get_fields() or {}
+        result.metadata["attachments"] = sorted((reader.attachments or {}).keys())
         for index, page in enumerate(reader.pages, start=1):
             text = page.extract_text() or ""
             result.sections.append(ExtractedSection("page_text", f"page:{index}", text))
@@ -217,7 +217,7 @@ class DocumentScanner:
 
     @staticmethod
     def _office_text(path: Path, result: DocumentScanResult) -> None:
-        """Extract legacy binary DOC through a locally installed LibreOffice."""
+        """Extract legacy office, OpenDocument and RTF content using local LibreOffice."""
         executable = shutil.which("soffice") or shutil.which("libreoffice")
         if not executable:
             result.warnings.append(
@@ -237,7 +237,7 @@ class DocumentScanner:
             output = output_dir / f"{path.stem}.txt"
             if completed.returncode != 0 or not output.is_file():
                 detail = (completed.stderr or completed.stdout or "conversão não concluída").strip()
-                result.warnings.append(f"Não foi possível converter o DOC: {detail[:500]}")
+                result.warnings.append(f"Não foi possível converter {path.suffix.upper()}: {detail[:500]}")
                 return
             content = output.read_text(encoding="utf-8", errors="replace")
             result.metadata["converted_with"] = Path(executable).name
