@@ -34,62 +34,200 @@ RATE_LABELS = {
 }
 
 APP_STYLE = """
-QMainWindow, QWidget#workspace { background: #202328; color: #e5e7eb; }
+* {
+    font-family: "Segoe UI", "Arial", sans-serif;
+    font-size: 10pt;
+}
+QMainWindow, QWidget#workspace {
+    background: #171a20;
+    color: #e8edf5;
+}
 QFrame#topbar, QFrame#sidebar, QFrame#properties, QFrame#panel {
-    background: #2a2e35; border: 1px solid #383e47; border-radius: 6px;
+    background: #222731;
+    border: 1px solid #343d49;
+    border-radius: 8px;
 }
-QLabel { color: #d8dce2; }
-QLabel#brand { color: #f1a34a; font-size: 17px; font-weight: 800; letter-spacing: 1px; }
-QLabel#pageTitle { color: #f4f5f7; font-size: 23px; font-weight: 700; }
-QLabel#muted { line-height: 1.25; }
-QPushButton { min-height: 18px; }
-QPushButton#nav { min-height: 20px; }
-QLabel#muted { color: #9ba3af; }
-QLabel#sectionTitle { color: #f0a34a; font-size: 11px; font-weight: 800; }
-QLineEdit {
-    background: #1d2025; color: #f0f2f5; border: 1px solid #454c57;
-    border-radius: 4px; padding: 7px; selection-background-color: #bd762f;
+QLabel { color: #e1e7ef; }
+QLabel#brand {
+    color: #e39a4b;
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: 1.4px;
 }
-QLineEdit:focus { border: 1px solid #e39a43; }
-QPushButton, QToolButton {
-    background: #383e47; color: #e8eaed; border: 1px solid #4a515c;
-    border-radius: 4px; padding: 7px 10px;
-}
-QPushButton:hover, QToolButton:hover { background: #454d58; border-color: #d58c3d; }
-QPushButton#primary { background: #b96f2d; color: #fff; border: 1px solid #d48b43; font-weight: 700; }
-QPushButton#primary:hover { background: #d08337; }
-QPushButton#nav { text-align: left; padding: 10px; background: transparent; border: 0; }
-QPushButton#nav:checked { background: #414751; color: #f4b15f; border-left: 3px solid #e49a43; }
-QTabWidget::pane { border: 1px solid #3b424c; background: #25292f; }
-QTabBar::tab {
-    background: #2c3138; color: #aeb5bf; padding: 9px 16px;
-    border: 1px solid #3a414b; border-bottom: 0; margin-right: 2px;
-}
-QTabBar::tab:selected { background: #25292f; color: #f2ae5b; border-top: 2px solid #e49a43; }
-QTabBar#datasetTabs { background: #25292f; }
-QTabBar#datasetTabs::tab { padding: 8px 14px; min-width: 90px; }
-QTabBar#datasetTabs::tab:selected { background: #343a43; }
-QTableWidget::item { padding: 3px 5px; }
-QTableWidget::item:selected { background: #59432f; }
-QTableWidget {
-    background: #22262c; alternate-background-color: #292e35;
-    color: #e1e5e9; gridline-color: #3b424c;
-    border: 1px solid #3b424c; selection-background-color: #57432f;
-    selection-color: #fff3e3;
-}
-QHeaderView::section {
-    background: #343a43; color: #e6e9ed; padding: 7px;
-    border: 0; border-right: 1px solid #464d58; border-bottom: 1px solid #4b535e;
+QLabel#pageTitle {
+    color: #f4f6fa;
+    font-size: 24px;
     font-weight: 700;
 }
-QTableCornerButton::section { background: #343a43; border: 0; }
-QScrollBar:vertical { background: #25292f; width: 12px; margin: 0; }
-QScrollBar::handle:vertical { background: #505864; min-height: 24px; border-radius: 5px; }
-QScrollBar:horizontal { background: #25292f; height: 12px; margin: 0; }
-QScrollBar::handle:horizontal { background: #505864; min-width: 24px; border-radius: 5px; }
-QStatusBar { background: #191c20; color: #aeb5bf; border-top: 1px solid #3b424c; }
-QMenu { background: #2b3037; color: #e5e7eb; border: 1px solid #454c57; }
-QMenu::item:selected { background: #57432f; }
+QLabel#muted { color: #9aa7b8; }
+QLabel#sectionTitle {
+    color: #e6a253;
+    font-size: 9pt;
+    font-weight: 800;
+    letter-spacing: .5px;
+}
+QLineEdit, QComboBox, QDateEdit, QSpinBox, QDoubleSpinBox {
+    background: #191e26;
+    color: #edf2f8;
+    border: 1px solid #3b4654;
+    border-radius: 6px;
+    padding: 8px 9px;
+    selection-background-color: #9b622e;
+    min-height: 18px;
+}
+QLineEdit:hover, QComboBox:hover { border-color: #657386; }
+QLineEdit:focus, QComboBox:focus {
+    border: 1px solid #e39a4b;
+    background: #1d232c;
+}
+QPushButton, QToolButton {
+    background: #303946;
+    color: #e8edf5;
+    border: 1px solid #465263;
+    border-radius: 6px;
+    padding: 8px 12px;
+    min-height: 20px;
+}
+QPushButton:hover, QToolButton:hover {
+    background: #3b4756;
+    border-color: #78879a;
+}
+QPushButton:pressed, QToolButton:pressed { background: #27313d; }
+QPushButton:disabled, QToolButton:disabled {
+    color: #697587;
+    background: #252c35;
+    border-color: #303946;
+}
+QPushButton#primary {
+    background: #c47a35;
+    color: #fffaf4;
+    border: 1px solid #df9950;
+    font-weight: 700;
+}
+QPushButton#primary:hover {
+    background: #d58b43;
+    border-color: #f0b16c;
+}
+QPushButton#nav {
+    text-align: left;
+    padding: 11px 12px;
+    min-height: 22px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+}
+QPushButton#nav:hover {
+    background: #2b333e;
+    border-color: #394554;
+}
+QPushButton#nav:checked {
+    background: #343e4b;
+    color: #f0b36b;
+    border: 1px solid #465363;
+    border-left: 3px solid #e39a4b;
+    font-weight: 700;
+}
+QTabWidget::pane {
+    border: 1px solid #394452;
+    background: #202630;
+    border-radius: 6px;
+    top: -1px;
+}
+QTabBar::tab {
+    background: #252d38;
+    color: #aab6c5;
+    padding: 10px 17px;
+    border: 1px solid #394452;
+    border-bottom: 0;
+    margin-right: 3px;
+}
+QTabBar::tab:hover { color: #f1c18d; background: #303a47; }
+QTabBar::tab:selected {
+    background: #202630;
+    color: #f0b36b;
+    border-top: 2px solid #e39a4b;
+    font-weight: 700;
+}
+QTabBar#datasetTabs { background: #202630; }
+QTabBar#datasetTabs::tab { padding: 9px 16px; min-width: 92px; }
+QTabBar#datasetTabs::tab:selected { background: #303a47; }
+QTableWidget {
+    background: #1c222b;
+    alternate-background-color: #242c36;
+    color: #e2e9f2;
+    gridline-color: #35404d;
+    border: 1px solid #394452;
+    border-radius: 5px;
+    selection-background-color: #59452f;
+    selection-color: #fff6eb;
+    outline: 0;
+}
+QTableWidget::item { padding: 5px 7px; }
+QTableWidget::item:hover { background: #303b49; }
+QTableWidget::item:selected { background: #59452f; }
+QHeaderView::section {
+    background: #2c3541;
+    color: #eaf0f7;
+    padding: 10px 8px;
+    border: 0;
+    border-right: 1px solid #3d4958;
+    border-bottom: 1px solid #465365;
+    font-weight: 700;
+}
+QTableCornerButton::section { background: #2c3541; border: 0; }
+QScrollBar:vertical {
+    background: #202630;
+    width: 11px;
+    margin: 2px;
+}
+QScrollBar::handle:vertical {
+    background: #536173;
+    min-height: 28px;
+    border-radius: 5px;
+}
+QScrollBar::handle:vertical:hover { background: #718197; }
+QScrollBar:horizontal {
+    background: #202630;
+    height: 11px;
+    margin: 2px;
+}
+QScrollBar::handle:horizontal {
+    background: #536173;
+    min-width: 28px;
+    border-radius: 5px;
+}
+QScrollBar::handle:horizontal:hover { background: #718197; }
+QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
+QStatusBar {
+    background: #14181e;
+    color: #aab6c5;
+    border-top: 1px solid #303a47;
+}
+QMenu {
+    background: #252d38;
+    color: #e8edf5;
+    border: 1px solid #465263;
+    padding: 5px;
+}
+QMenu::item { padding: 8px 28px 8px 12px; border-radius: 4px; }
+QMenu::item:selected { background: #3a4655; color: #f4c18a; }
+QMenu::separator { height: 1px; background: #3b4654; margin: 5px 8px; }
+QToolTip {
+    background: #303946;
+    color: #f2f5f9;
+    border: 1px solid #657386;
+    padding: 5px 7px;
+}
+QMessageBox, QDialog { background: #202630; color: #e8edf5; }
+QGroupBox {
+    color: #e6a253;
+    border: 1px solid #3b4654;
+    border-radius: 6px;
+    margin-top: 10px;
+    padding-top: 8px;
+    font-weight: 700;
+}
+QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
 """
 
 
@@ -196,8 +334,8 @@ class MainWindow(QMainWindow):
 
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setMinimumWidth(175)
-        sidebar.setMaximumWidth(205)
+        sidebar.setMinimumWidth(190)
+        sidebar.setMaximumWidth(245)
         side = QVBoxLayout(sidebar)
         side.setContentsMargins(10, 14, 10, 12)
         side.setSpacing(7)
@@ -217,21 +355,33 @@ class MainWindow(QMainWindow):
         side.addWidget(self.nav_data)
         side.addWidget(self.nav_indicators)
         self.nav_workspace = QPushButton("▦   Espaço de dados")
-        self.nav_workspace.setObjectName("nav")
-        self.nav_workspace.clicked.connect(self.open_workspace)
+        self.nav_workspace.setObjectName("nav")        self.nav_workspace.clicked.connect(self.open_workspace)
         self.nav_documents = QPushButton("▧   Biblioteca documental")
         self.nav_documents.setObjectName("nav")
         self.nav_documents.clicked.connect(self.open_document_library)
         side.addWidget(self.nav_workspace)
         side.addWidget(self.nav_documents)
 
-        side.addSpacing(12)
-        filter_title = QLabel("FILTROS DE CONSULTA")
-        filter_title.setObjectName("sectionTitle")
-        side.addWidget(filter_title)
+        side.addSpacing(10)
+        self.filters_toggle = QToolButton()
+        self.filters_toggle.setText("⌄  FILTROS DE CONSULTA")
+        self.filters_toggle.setCheckable(True)
+        self.filters_toggle.setChecked(True)
+        self.filters_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.filters_toggle.setStyleSheet(
+            "QToolButton { text-align:left; color:#e6a253; font-weight:800; "
+            "border:0; background:transparent; padding:8px 2px; }"
+            "QToolButton:hover { color:#f4c18a; background:#2b333e; }"
+        )
+        side.addWidget(self.filters_toggle)
+
+        self.filters_panel = QWidget()
+        filters_layout = QVBoxLayout(self.filters_panel)
+        filters_layout.setContentsMargins(0, 2, 0, 4)
+        filters_layout.setSpacing(7)
         self.type_input = QLineEdit()
         self.type_input.setPlaceholderText("Tipo de obra")
-        side.addWidget(self.type_input)
+        filters_layout.addWidget(self.type_input)
         self.fields = {}
         for key, label in [
             ("width", "Largura (m)"),
@@ -240,14 +390,15 @@ class MainWindow(QMainWindow):
         ]:
             caption = QLabel(label)
             caption.setObjectName("muted")
-            side.addWidget(caption)
+            filters_layout.addWidget(caption)
             pair = QHBoxLayout()
+            pair.setSpacing(6)
             low, high = QLineEdit(), QLineEdit()
             low.setPlaceholderText("Mín.")
             high.setPlaceholderText("Máx.")
             pair.addWidget(low)
             pair.addWidget(high)
-            side.addLayout(pair)
+            filters_layout.addLayout(pair)
             self.fields[key] = (low, high)
 
         search_button = QPushButton("Aplicar filtros")
@@ -255,8 +406,15 @@ class MainWindow(QMainWindow):
         search_button.clicked.connect(self.search)
         clear_button = QPushButton("Limpar filtros")
         clear_button.clicked.connect(self.clear)
-        side.addWidget(search_button)
-        side.addWidget(clear_button)
+        filters_layout.addWidget(search_button)
+        filters_layout.addWidget(clear_button)
+        side.addWidget(self.filters_panel)
+        self.filters_toggle.toggled.connect(self.filters_panel.setVisible)
+        self.filters_toggle.toggled.connect(
+            lambda expanded: self.filters_toggle.setText(
+                "⌄  FILTROS DE CONSULTA" if expanded else "›  FILTROS DE CONSULTA"
+            )
+        )
         side.addStretch()
 
         help_label = QLabel(
@@ -342,10 +500,10 @@ class MainWindow(QMainWindow):
         self.table.setWordWrap(False)
         self.table.setShowGrid(True)
         self.table.verticalHeader().setVisible(True)
-        self.table.verticalHeader().setDefaultSectionSize(27)
+        self.table.verticalHeader().setDefaultSectionSize(30)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.table.horizontalHeader().setDefaultSectionSize(125)
+        self.table.horizontalHeader().setDefaultSectionSize(140)
         self.table.horizontalHeader().setMinimumSectionSize(75)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.itemSelectionChanged.connect(self._update_properties)
@@ -395,8 +553,8 @@ class MainWindow(QMainWindow):
 
         properties = QFrame()
         properties.setObjectName("properties")
-        properties.setMinimumWidth(205)
-        properties.setMaximumWidth(255)
+        properties.setMinimumWidth(235)
+        properties.setMaximumWidth(310)
         props = QVBoxLayout(properties)
         props.setContentsMargins(12, 14, 12, 12)
         props.setSpacing(8)
@@ -423,7 +581,7 @@ class MainWindow(QMainWindow):
         body.setStretchFactor(0, 0)
         body.setStretchFactor(1, 1)
         body.setStretchFactor(2, 0)
-        body.setSizes([185, 850, 225])
+        body.setSizes([215, 900, 265])
         root.addWidget(body, 1)
 
         self.setCentralWidget(workspace)
@@ -447,8 +605,7 @@ class MainWindow(QMainWindow):
         return [record for record in self.repo.records if self._dataset_key(record) == key]
 
     def _refresh_dataset_navigation(self, selected_key=None):
-        selected_key = selected_key or self._active_dataset
-        entries = [("__all__", "Todas")]
+        selected_key = selected_key or self._active_dataset        entries = [("__all__", "Todas")]
         if any(not record.source_file for record in self.repo.records):
             entries.append(("__base__", "Base principal"))
         imported = {}
@@ -677,8 +834,7 @@ class MainWindow(QMainWindow):
         dialog = DocumentScanDialog(results, self)
         dialog.exec()
         state = "cancelada" if cancelled else "concluída"
-        self.statusBar().showMessage(
-            f"Análise {state}: {len(results)} arquivo(s) processado(s)."
+        self.statusBar().showMessage(            f"Análise {state}: {len(results)} arquivo(s) processado(s)."
         )
 
     def import_excel(self):
@@ -863,61 +1019,3 @@ class MainWindow(QMainWindow):
             )
             self.summary_detail.setText(
                 "Sem filtros ativos. As estatísticas consideram todos os registros carregados."
-            )
-        else:
-            uncertain = sum(
-                bool(missing_criteria_fields(record, criteria))
-                for record in records
-            )
-            verified = result_count - uncertain
-            rejected = max(0, source_count - result_count)
-            self.summary_headline.setText(
-                f"{result_count} registros retornados de {source_count} registros da base."
-            )
-            self.summary_detail.setText(
-                f"Compatibilidade verificável: {verified}  |  "
-                f"Dados insuficientes: {uncertain}  |  "
-                f"Não retornados por divergência: {rejected}.\n"
-                "Registros incompletos permanecem disponíveis para conferência."
-            )
-        summaries = summarize_rates(records)
-        self.rate_table.setSortingEnabled(False)
-        self.rate_table.setRowCount(len(RATE_FIELDS))
-        for row, field in enumerate(RATE_FIELDS):
-            item = summaries[field]
-            count = item["count"]
-            coverage = (100 * count / result_count) if result_count else 0
-            values = [
-                RATE_LABELS.get(field, field), str(count),
-                f"{coverage:.1f}%".replace(".", ","),
-                _pt_number(item["mean"]), _pt_number(item["median"]),
-                _pt_number(item["minimum"]), _pt_number(item["maximum"]),
-            ]
-            for column, value in enumerate(values):
-                cell = QTableWidgetItem(value)
-                if column > 0:
-                    cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.rate_table.setItem(row, column, cell)
-        self.rate_table.setSortingEnabled(True)
-
-    def show_records(self, records, criteria=None):
-        self._show_summary(records, criteria)
-        self._records_by_id = {record.source_row: record for record in records}
-        columns = list(dict.fromkeys(
-            key for record in records for key in record.values
-        ))
-        self.table.setSortingEnabled(False)
-        self.table.clear()
-        self.table.setRowCount(len(records))
-        self.table.setColumnCount(len(columns))
-        self.table.setHorizontalHeaderLabels(columns)
-        for row_index, record in enumerate(records):
-            for column_index, key in enumerate(columns):
-                value = format_display_value(record.get(key))
-                cell = QTableWidgetItem(value)
-                if column_index == 0:
-                    cell.setData(Qt.ItemDataRole.UserRole, record.source_row)
-                self.table.setItem(row_index, column_index, cell)
-        self.table.setSortingEnabled(True)
-        self.grid_count.setText(f"{len(records)} registros")
-        self.clear_properties()
