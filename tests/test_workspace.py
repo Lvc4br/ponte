@@ -179,3 +179,46 @@ def test_workspace_store_reopens_without_losing_tables_or_records(tmp_path):
     store.insert_record(table, {"Valor": 42})
     reopened = WorkspaceStore(path)
     assert reopened.list_records(table)[0]["values"]["Valor"] == 42
+
+
+def test_calculated_columns_evaluate_dependencies_and_filter(tmp_path):
+    store, project = build_store(tmp_path)
+    table = store.create_table(project, "Orçamento")
+    store.add_column(table, "Quantidade", "decimal")
+    store.add_column(table, "Preço", "decimal")
+    store.insert_record(table, {"Quantidade": 3, "Preço": 12.5})
+    store.add_column(table, "Total", "decimal", formula="Quantidade * Preço")
+    store.add_column(table, "Total com taxa", "decimal", formula="Total * 1.1")
+    records = store.list_records(table, filters={"Total": {"gt": 30}})
+    assert records[0]["values"]["Total"] == 37.5
+    assert records[0]["values"]["Total com taxa"] == 41.25
+    with pytest.raises(ValueError):
+        store.update_record(records[0]["id"], {"Total": 99})
+
+
+def test_formula_columns_reject_unknown_and_circular_dependencies(tmp_path):
+    store, project = build_store(tmp_path)
+    table = store.create_table(project, "Dados")
+    store.add_column(table, "A", "decimal")
+    with pytest.raises(ValueError):
+        store.add_column(table, "B", "decimal", formula="Desconhecida + 1")
+    b = store.add_column(table, "B", "decimal", formula="A + 1")
+    with pytest.raises(ValueError):
+        store.rename_column(store.list_columns(table)[0]["id"], "Renomeada")
+    assert b
+
+
+def test_workspace_schema_v1_migrates_additively_to_v2(tmp_path):
+    import sqlite3
+    path = tmp_path / "migration.sqlite3"
+    store = WorkspaceStore(path)
+    project = store.create_project("Legado")
+    table = store.create_table(project, "Tabela")
+    store.add_column(table, "Valor")
+    store.insert_record(table, {"Valor": "mantido"})
+    with sqlite3.connect(path) as db:
+        db.execute("ALTER TABLE workspace_columns DROP COLUMN formula")
+        db.execute("UPDATE ponte_schema_version SET version=1 WHERE component='workspace'")
+    migrated = WorkspaceStore(path)
+    assert migrated.list_records(table)[0]["values"]["Valor"] == "mantido"
+    assert migrated.list_columns(table)[0]["formula"] is None
