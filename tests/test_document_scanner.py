@@ -157,3 +157,14 @@ def test_invalid_pdf_is_reported_as_error_without_stopping_batch(tmp_path):
     assert results[0].status == "success"
     assert results[1].status == "error"
     assert results[1].errors
+
+def test_legacy_doc_without_libreoffice_is_reported_as_partial(tmp_path, monkeypatch):
+    source = tmp_path / "arquivo_antigo.doc"
+    source.write_bytes(b"binary DOC placeholder")
+    monkeypatch.setattr("app.documents.scanner.shutil.which", lambda _name: None)
+
+    result = DocumentScanner().scan(source)
+
+    assert result.status == "partial"
+    assert result.warnings
+    assert result.sections == []
