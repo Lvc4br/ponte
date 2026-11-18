@@ -498,13 +498,27 @@ class DocumentScanner:
             return
         model = ifcopenshell.open(str(path))
         entities = []
-        for element in model.by_type("IfcProduct"):
-            entities.append({
+        try:
+            from ifcopenshell.util.element import get_psets
+        except ImportError:
+            get_psets = None
+        products = model.by_type("IfcProduct")
+        for element in products[:100000]:
+            item = {
                 "global_id": getattr(element, "GlobalId", None),
                 "ifc_type": element.is_a(),
                 "name": getattr(element, "Name", None),
                 "description": getattr(element, "Description", None),
-            })
+                "object_type": getattr(element, "ObjectType", None),
+            }
+            if get_psets is not None:
+                try:
+                    item["property_sets"] = get_psets(element)
+                except Exception:
+                    item["property_sets"] = {}
+            entities.append(item)
         result.metadata["ifc_schema"] = model.schema
-        result.metadata["product_count"] = len(entities)
+        result.metadata["product_count"] = len(products)
+        if len(products) > 100000:
+            result.warnings.append("IFC limitado aos primeiros 100.000 produtos para proteger a memória.")
         result.sections.append(ExtractedSection("bim_products", "ifc:products", entities))
