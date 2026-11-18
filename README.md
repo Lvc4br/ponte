@@ -14,7 +14,7 @@ O objetivo de longo prazo é oferecer uma alternativa independente para parte re
 - Navegação entre base principal e planilhas importadas na interface antiga de Gestão de Obras.
 - Filtros e indicadores específicos do conjunto de dados legado.
 - Scanner documental em `app/documents/scanner.py`, com resultado padronizado, SHA-256, metadados, seções, avisos, erros e varredura recursiva em lote.
-- Ação **Analisar documentos** integrada à interface, com execução em thread separada e visualização do conteúdo extraído.
+- Ações **Analisar documentos** e **Biblioteca documental** integradas à interface, com execução em thread separada, visualização do conteúdo extraído e catálogo SQLite persistente.
 - Leitura inicial de PDF, DOCX, XLSX/XLSM, XLS, PPTX, CSV, TXT, Markdown, JSON, XML, imagens com OCR opcional, DXF e IFC opcional.
 - Testes unitários iniciais do scanner para texto, CSV, JSON, formatos ainda não suportados e arquivo inexistente.
 
@@ -26,7 +26,7 @@ O objetivo de longo prazo é oferecer uma alternativa independente para parte re
 - DWG e RVT ainda não têm leitor integrado. Conversão e integração devem ser avaliadas separadamente.
 - A leitura inicial de DOCX/PPTX/XLSX não extrai todos os objetos incorporados, gráficos, caixas de texto, comentários, macros ou conexões externas.
 - O scanner extrai conteúdo; não certifica documentos, não valida cálculos nem substitui análise profissional de engenharia.
-- A interface ainda não oferece uma biblioteca documental integrada nem processamento em lote. A implementação do scanner é uma fundação de backend.
+- A interface já permite analisar múltiplos arquivos e consultar a biblioteca local; seleção direta de pastas, progresso detalhado e cancelamento ainda estão pendentes.
 
 ## Arquitetura e escopo
 
