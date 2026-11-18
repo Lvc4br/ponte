@@ -1,19 +1,16 @@
 # Changelog
 
-## Em desenvolvimento — PONTE Gerenciador Universal de Dados e Documentos
+## Em desenvolvimento — PONTE Gerenciador Universal
 
-- Reposicionamento do produto: projetos de qualquer setor; pontes/obras passam a ser apenas um conjunto de dados existente.
-- Criado pacote `app/documents` com scanner de arquivos, SHA-256, metadados, conteúdo extraído, avisos e erros.
-- Integrada a análise assíncrona de múltiplos documentos à interface e criada visualização das extrações.
-- Criado catálogo documental SQLite persistente, com deduplicação por SHA-256 e armazenamento das seções extraídas.
-- Adicionada varredura recursiva de pastas pela interface e consulta posterior pela biblioteca documental.
-- Atualizado o build Windows para coletar dependências dos leitores documentais.
-- Adicionados leitores iniciais para PDF, DOCX, XLSX/XLSM, XLS, PPTX, CSV, TXT, MD, JSON, XML, imagens com OCR opcional, DXF e IFC opcional.
-- Adicionados testes iniciais do scanner e documentação da arquitetura universal.
-- Incluídas dependências para PDF, Word, PowerPoint, XLS e DXF.
-- DWG/RVT, OCR completo, processamento em lote, inventário documental persistente e integração com a interface continuam pendentes.
+- Consolidado o objetivo de gerenciador universal de dados e documentos para projetos de qualquer setor.
+- Criado workspace SQLite com projetos, tabelas, colunas tipadas, registros e relacionamentos.
+- Criadas operações CRUD, validação, filtros, ordenação e paginação para tabelas genéricas.
+- Adicionado motor de fórmulas seguro baseado em AST, com colunas calculadas e referências a nomes de colunas entre colchetes.
+- Criada interface inicial para projetos e tabelas, com edição de células e colunas calculadas.
+- Criados adaptadores de importação/exportação CSV e XLSX/XLSM.
+- Adicionada migração aditiva versionada do esquema do workspace.
+- Ampliado scanner para DOC/PPT/RTF/ODT/ODP via LibreOffice, XLSB, PDF com tabelas, DWG via ODA opcional, IFC com propriedades e reconhecimento de RVT/RFA.
+- Adicionadas verificações de segurança para containers Office/OpenDocument.
+- Atualizados testes automatizados, dependências e workflows de CI e pacote Windows.
 
-## Histórico anterior
-
-As funcionalidades antigas de Gestão de Obras, importação Excel, navegação por planilhas, persistência SQLite e filtros dimensionais permanecem no código como legado funcional. A migração para o modelo genérico ainda não foi concluída.
-
+As alterações ainda precisam passar pelo GitHub Actions, build Windows e smoke test do executável antes de qualquer atualização do PC.
