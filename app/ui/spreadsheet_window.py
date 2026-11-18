@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton,
     QSplitter, QTableWidget, QTableWidgetItem, QTreeWidget, QTreeWidgetItem,
     QVBoxLayout, QWidget, QComboBox, QTextEdit, QHeaderView, QAbstractItemView,
-    QScrollArea, QStackedWidget,
+    QScrollArea, QStackedWidget, QProgressDialog,
 )
 
 from app.documents.index import DocumentIndex
@@ -115,6 +115,8 @@ class SpreadsheetWindow(QMainWindow):
         self._legacy_window = None
         self._pdf_document = None
         self._pdf_page_index = 0
+        self._scan_worker = None
+        self._scan_progress = None
         self._build()
         self._load_projects()
 
@@ -230,6 +232,9 @@ class SpreadsheetWindow(QMainWindow):
         open_button = QPushButton("Abrir arquivo")
         open_button.clicked.connect(self._open_document)
         doc_head.addWidget(open_button)
+        scan_button = QPushButton("Analisar arquivos")
+        scan_button.clicked.connect(self._scan_documents)
+        doc_head.addWidget(scan_button)
         refresh_button = QPushButton("Atualizar")
         refresh_button.clicked.connect(self._refresh_documents)
         doc_head.addWidget(refresh_button)
@@ -733,6 +738,69 @@ class SpreadsheetWindow(QMainWindow):
             self._refresh_grid()
         except Exception as exc:
             QMessageBox.warning(self, "Fórmula inválida", str(exc))
+
+    def _scan_documents(self):
+        if self.project_id is None:
+            QMessageBox.information(self, "Analisar documentos", "Selecione um projeto primeiro.")
+            return
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Selecionar documentos para análise", "",
+            "Documentos suportados (*.pdf *.doc *.docx *.ppt *.pptx *.rtf *.odt *.odp "
+            "*.xlsx *.xlsm *.xls *.xlsb *.csv *.txt *.md *.json *.xml *.dxf *.dwg "
+            "*.ifc *.rvt *.rfa *.png *.jpg *.jpeg *.tif *.tiff *.bmp *.webp *.gif);;"
+            "Todos os arquivos (*.*)"
+        )
+        if not paths:
+            return
+        try:
+            from app.ui.main_window import DocumentScanWorker
+            self._scan_worker = DocumentScanWorker(paths, self)
+            self._scan_progress = QProgressDialog(
+                "Preparando análise documental…", "Cancelar", 0, 0, self
+            )
+            self._scan_progress.setWindowTitle("Análise de documentos")
+            self._scan_progress.setWindowModality(Qt.WindowModality.WindowModal)
+            self._scan_progress.canceled.connect(self._scan_worker.cancel)
+            self._scan_worker.progress.connect(self._scan_progress_update)
+            self._scan_worker.completed.connect(self._scan_completed)
+            self._scan_progress.show()
+            self._scan_worker.start()
+        except Exception as exc:
+            QMessageBox.warning(self, "Análise documental", str(exc))
+
+    def _scan_progress_update(self, current, total, file_name):
+        if self._scan_progress is None:
+            return
+        self._scan_progress.setRange(0, max(1, total))
+        self._scan_progress.setValue(current)
+        self._scan_progress.setLabelText(f"Analisando {current} de {total}: {file_name}")
+
+    def _scan_completed(self, results):
+        linked = 0
+        failures = []
+        try:
+            for result in results:
+                document_id = self.documents.index_result(result)
+                if self.store.link_document(self.project_id, document_id):
+                    linked += 1
+                if result.status == "error":
+                    failures.append(result.file_name)
+            self._refresh_documents()
+            self.status.setText(
+                f"{len(results)} arquivo(s) analisado(s) · {linked} novo(s) vínculo(s) documental(is)"
+            )
+            if failures:
+                QMessageBox.warning(
+                    self, "Análise concluída com avisos",
+                    "Não foi possível analisar completamente:\n" + "\n".join(failures[:20])
+                )
+        except Exception as exc:
+            QMessageBox.warning(self, "Análise documental", str(exc))
+        finally:
+            if self._scan_progress is not None:
+                self._scan_progress.close()
+            self._scan_progress = None
+            self._scan_worker = None
 
     def _refresh_documents(self):
         self.document_tree.clear()
