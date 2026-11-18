@@ -67,7 +67,7 @@ class WorkspaceDialog(QDialog):
         for index, (label, callback) in enumerate(actions):
             button = QPushButton(label)
             button.clicked.connect(callback)
-            (table_row if index < 4 else action_row).addWidget(button)
+            (table_row if index < 7 else action_row).addWidget(button)
         root.addLayout(table_row)
         root.addLayout(action_row)
 
