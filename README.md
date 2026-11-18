@@ -1,14 +1,14 @@
-# Consulta de Taxas de Pontes
+# Gestão de Obras
 
-Aplicativo desktop para **organização, consulta e manutenção de registros técnicos de engenharia**, com foco inicial em pontes e obras de arte especiais (OAEs). O projeto trabalha com dados tabulares provenientes de scripts SQL e planilhas Excel, permitindo consultar dimensões e indicadores associados a materiais e serviços, como taxas de concreto e aço.
+Aplicativo desktop para **gerenciamento de dados de obras de engenharia**. Reúne registros técnicos de diferentes obras em uma base tabular local, com importação de planilhas Excel, consulta por características dimensionais, manutenção dos registros e indicadores disponíveis. O conjunto atual de dados tem foco inicial em pontes e obras de arte especiais (OAEs), mas a interface e o objetivo do produto passam a ser apresentados como um workspace de gestão de dados de obras.
 
-O objetivo é facilitar a organização de referências técnicas e planilhas de engenharia. O aplicativo **não é um sistema completo de gestão eletrônica de documentos (GED)** e não realiza dimensionamento, análise ou validação estrutural.
+O objetivo é centralizar e facilitar a organização, consulta e manutenção dos dados técnicos de obras em um ambiente de trabalho. A interface adota uma organização visual inspirada em ferramentas profissionais como Blender (workspace escuro, painéis laterais e propriedades) e Excel (grade tabular, cabeçalhos e seleção de linhas), sem reproduzir marcas ou funcionalidades que ainda não existem. O aplicativo **não é um sistema completo de gestão eletrônica de documentos (GED)** e não realiza dimensionamento, análise ou validação estrutural.
 
 ## Situação atual do projeto
 
 ### Implementado na branch main
 
-- Aplicativo desktop Windows desenvolvido em Python e PySide6.
+- Aplicativo desktop Windows desenvolvido em Python e PySide6.\n- Workspace redesenhado para gestão de dados de obras, com tema escuro, navegação lateral, grade de registros inspirada em planilhas e painel de propriedades.
 - Leitura de base SQL local, aceitando tabelas obras e analise_oaes.
 - Armazenamento da base ativa em SQLite local.
 - Consulta com filtros por tipo de obra, largura, vão e comprimento total.
@@ -117,7 +117,7 @@ Esses itens não devem ser considerados funcionalidades disponíveis até que se
 
 ## Limites de uso técnico
 
-O aplicativo organiza e consulta referências históricas. Não dimensiona estruturas, não verifica segurança estrutural, não certifica dados de origem e não substitui a avaliação de profissional habilitado.
+O aplicativo organiza, consulta e mantém registros técnicos de obras. Não dimensiona estruturas, não verifica segurança estrutural, não certifica dados de origem e não substitui a avaliação de profissional habilitado.
 
 As estatísticas são calculadas por registro, não necessariamente por obra única. Segmentos de uma mesma obra podem aparecer como registros distintos e influenciar as estatísticas separadamente.
 
