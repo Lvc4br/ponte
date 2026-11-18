@@ -4,8 +4,9 @@ import json
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QFileDialog, QHBoxLayout, QInputDialog, QLabel,
-    QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
+    QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPlainTextEdit,
+    QPushButton, QScrollArea, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from app.workspace.exchange import SpreadsheetExchange
@@ -32,6 +33,12 @@ class WorkspaceDialog(QDialog):
         self.add_project_button = QPushButton("Novo projeto")
         self.add_project_button.clicked.connect(self._add_project)
         project_row.addWidget(self.add_project_button)
+        rename_project = QPushButton("Renomear")
+        rename_project.clicked.connect(self._rename_project)
+        project_row.addWidget(rename_project)
+        delete_project = QPushButton("Excluir projeto")
+        delete_project.clicked.connect(self._delete_project)
+        project_row.addWidget(delete_project)
         root.addLayout(project_row)
 
         table_row = QHBoxLayout()
@@ -41,8 +48,11 @@ class WorkspaceDialog(QDialog):
         table_row.addWidget(self.tables, 1)
         for label, callback in (
             ("Nova tabela", self._add_table),
+            ("Renomear tabela", self._rename_table),
+            ("Excluir tabela", self._delete_table),
             ("Nova coluna", self._add_column),
             ("Coluna calculada", self._add_formula_column),
+            ("Excluir coluna", self._delete_column),
             ("Novo registro", self._add_record),
             ("Excluir registro", self._delete_record),
             ("Importar CSV", self._import_csv),
@@ -165,6 +175,72 @@ class WorkspaceDialog(QDialog):
         except Exception as exc:
             QMessageBox.warning(self, "Tabela", str(exc))
 
+    def _rename_project(self):
+        if self.project_id is None:
+            return
+        current = self.projects.currentText()
+        name, ok = QInputDialog.getText(self, "Renomear projeto", "Nome:", text=current)
+        if ok:
+            try:
+                self.store.update_project(self.project_id, name=name)
+                self._refresh_projects(self.project_id)
+            except Exception as exc:
+                QMessageBox.warning(self, "Projeto", str(exc))
+
+    def _delete_project(self):
+        if self.project_id is None:
+            return
+        if QMessageBox.question(
+            self, "Excluir projeto",
+            "Isso excluirá as tabelas e registros deste projeto. Deseja continuar?"
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        self.store.delete_project(self.project_id)
+        self._refresh_projects()
+
+    def _rename_table(self):
+        if self.table_id is None:
+            return
+        name, ok = QInputDialog.getText(
+            self, "Renomear tabela", "Nome:", text=self.tables.currentText()
+        )
+        if ok:
+            try:
+                self.store.update_table(self.table_id, name=name)
+                self._project_changed(self.projects.currentIndex())
+            except Exception as exc:
+                QMessageBox.warning(self, "Tabela", str(exc))
+
+    def _delete_table(self):
+        if self.table_id is None:
+            return
+        if QMessageBox.question(
+            self, "Excluir tabela",
+            "A tabela e seus registros serão excluídos. Deseja continuar?"
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        self.store.delete_table(self.table_id)
+        self._project_changed(self.projects.currentIndex())
+
+    def _delete_column(self):
+        if self.table_id is None or not self.columns:
+            return
+        names = [column["name"] for column in self.columns]
+        name, ok = QInputDialog.getItem(self, "Excluir coluna", "Coluna:", names, 0, False)
+        if not ok:
+            return
+        column = next(item for item in self.columns if item["name"] == name)
+        if QMessageBox.question(
+            self, "Excluir coluna",
+            f"Remover '{name}' e os valores dessa coluna em todos os registros?"
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.store.delete_column(column["id"])
+            self._refresh_grid()
+        except Exception as exc:
+            QMessageBox.warning(self, "Coluna", str(exc))
+
     def _add_column(self):
         if self.table_id is None:
             QMessageBox.information(self, "Coluna", "Crie ou selecione uma tabela primeiro.")
@@ -212,16 +288,67 @@ class WorkspaceDialog(QDialog):
         if self.table_id is None or not self.columns:
             QMessageBox.information(self, "Registro", "Crie uma tabela e ao menos uma coluna.")
             return
-        labels = {c["name"]: c["data_type"] for c in self.columns}
-        template = {c["name"]: c["default"] for c in self.columns}
-        raw, ok = QInputDialog.getMultiLineText(
-            self, "Novo registro", "Valores em JSON (use os nomes das colunas):",
-            json.dumps(template, ensure_ascii=False, indent=2)
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Novo registro")
+        dialog.resize(520, min(760, 160 + 58 * len(self.columns)))
+        outer = QVBoxLayout(dialog)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        form_widget = QWidget()
+        form = QFormLayout(form_widget)
+        controls = {}
+        for column in self.columns:
+            if column.get("formula"):
+                continue
+            data_type = column["data_type"]
+            default = column["default"]
+            if data_type == "boolean":
+                control = QCheckBox()
+                control.setChecked(bool(default) if default is not None else False)
+            elif data_type == "json":
+                control = QPlainTextEdit()
+                control.setMaximumHeight(90)
+                control.setPlainText(
+                    json.dumps(default, ensure_ascii=False, indent=2)
+                    if default is not None else ""
+                )
+            else:
+                control = QLineEdit()
+                control.setPlaceholderText(
+                    "" if default is None else f"Padrão: {default}"
+                )
+                if default is not None:
+                    control.setText(str(default))
+            form.addRow(f"{column['name']} ({data_type})", control)
+            controls[column["name"]] = control
+        scroll.setWidget(form_widget)
+        outer.addWidget(scroll, 1)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
-        if not ok:
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        outer.addWidget(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         try:
-            values = json.loads(raw)
+            values = {}
+            for column in self.columns:
+                name = column["name"]
+                if column.get("formula"):
+                    continue
+                control = controls[name]
+                if column["data_type"] == "boolean":
+                    value = control.isChecked()
+                elif column["data_type"] == "json":
+                    raw = control.toPlainText().strip()
+                    value = None if not raw else json.loads(raw)
+                else:
+                    raw = control.text().strip()
+                    value = self._parse_cell(raw, column["data_type"])
+                    if value is None and column["default"] is not None:
+                        value = column["default"]
+                values[name] = value
             self.store.insert_record(self.table_id, values)
             self._refresh_grid()
         except Exception as exc:
