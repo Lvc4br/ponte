@@ -61,7 +61,7 @@ Não há equivalência total com Excel: sem VBA, macros, funções financeiras/e
 | IFC | Produtos e conjuntos de propriedades | IfcOpenShell opcional; geometria detalhada pendente |
 | RVT/RFA | Reconhecimento e orientação de exportação | Sem leitor direto; exportar IFC/PDF pelo Revit |
 
-## Segurança e limites
+## Backup e restauração\n\n`app/data/backup_manager.py` cria snapshot consistente com a API de backup do SQLite, verifica `integrity_check` e `foreign_key_check`, registra SHA-256 em manifesto JSON e valida o arquivo antes da restauração. Antes de substituir o banco ativo, gera automaticamente um backup de segurança. A restauração deve ser seguida de reinicialização do aplicativo.\n\n## Segurança e limites
 
 - Arquivos maiores que 512 MiB são recusados.
 - Containers Office/OpenDocument têm limites de quantidade de entradas, tamanho expandido e taxa de compressão.
@@ -74,7 +74,7 @@ Não há equivalência total com Excel: sem VBA, macros, funções financeiras/e
 
 1. CI verde em Windows e Linux para Python 3.11, 3.12 e 3.13.
 2. Build Windows e execução de smoke test do executável empacotado.
-3. Backup/restauração do SQLite, incluindo testes de integridade e preservação do legado.
+3. Testes de recuperação em cópias reais e validação de preservação do legado.
 4. Melhorar a interface tabular: edição em lote, copiar/colar, desfazer/refazer, filtros visuais, ordenação e atalhos.
 5. Importação mais robusta, prévia, mapeamento de colunas e relatório de erros.
 6. Revisão humana das extrações e vinculação de trechos documentais aos registros.
