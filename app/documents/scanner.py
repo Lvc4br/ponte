@@ -53,7 +53,7 @@ class DocumentScanner:
     SUPPORTED = {
         ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".rtf", ".odt", ".odp",
         ".xlsx", ".xlsm", ".xls", ".xlsb", ".csv", ".txt", ".md", ".json",
-        ".xml", ".dxf", ".dwg", ".ifc", ".png", ".jpg", ".jpeg", ".tif",
+        ".xml", ".dxf", ".dwg", ".ifc", ".rvt", ".rfa", ".png", ".jpg", ".jpeg", ".tif",
         ".tiff", ".bmp", ".webp", ".gif",
     }
 
@@ -130,6 +130,8 @@ class DocumentScanner:
                 ".dxf": self._dxf,
                 ".dwg": self._dwg,
                 ".ifc": self._ifc,
+                ".rvt": self._revit_notice,
+                ".rfa": self._revit_notice,
                 ".png": self._image,
                 ".jpg": self._image,
                 ".jpeg": self._image,
@@ -486,6 +488,14 @@ class DocumentScanner:
             result.warnings.append(
                 "DWG convertido para DXF por ferramenta externa; confirme fidelidade de entidades e cotas."
             )
+
+    @staticmethod
+    def _revit_notice(path: Path, result: DocumentScanResult) -> None:
+        result.warnings.append(
+            f"{path.suffix.upper()} reconhecido como arquivo Autodesk Revit, mas não há "
+            "leitor direto independente integrado. Exporte pelo Revit para IFC ou PDF "
+            "e analise o arquivo exportado."
+        )
 
     @staticmethod
     def _ifc(path: Path, result: DocumentScanResult) -> None:
