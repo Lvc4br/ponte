@@ -13,14 +13,15 @@ O objetivo de longo prazo é oferecer uma alternativa independente para parte re
 - Importação atual de planilhas .xlsx com seleção de aba, prévia e proteção contra reimportação.
 - Navegação entre base principal e planilhas importadas na interface antiga de Gestão de Obras.
 - Filtros e indicadores específicos do conjunto de dados legado.
-- Scanner documental inicial em `app/documents/scanner.py`, com resultado padronizado, SHA-256, metadados, seções, avisos e erros.
+- Scanner documental em `app/documents/scanner.py`, com resultado padronizado, SHA-256, metadados, seções, avisos, erros e varredura recursiva em lote.
+- Ação **Analisar documentos** integrada à interface, com execução em thread separada e visualização do conteúdo extraído.
 - Leitura inicial de PDF, DOCX, XLSX/XLSM, XLS, PPTX, CSV, TXT, Markdown, JSON, XML, imagens com OCR opcional, DXF e IFC opcional.
 - Testes unitários iniciais do scanner para texto, CSV, JSON, formatos ainda não suportados e arquivo inexistente.
 
 ### Limitações importantes do scanner
 
 - PDF digitalizado pode precisar de OCR; a leitura atual de PDF extrai texto acessível, não interpreta integralmente desenhos ou anexos.
-- OCR de imagens exige Pillow, pytesseract e o executável Tesseract instalado e configurado.
+- OCR de imagens e páginas PDF digitalizadas exige Pillow, pytesseract, pypdfium2 e o executável Tesseract instalado e configurado.
 - DXF e IFC dependem de leitores específicos; IFC requer IfcOpenShell compatível com a versão de Python.
 - DWG e RVT ainda não têm leitor integrado. Conversão e integração devem ser avaliadas separadamente.
 - A leitura inicial de DOCX/PPTX/XLSX não extrai todos os objetos incorporados, gráficos, caixas de texto, comentários, macros ou conexões externas.
