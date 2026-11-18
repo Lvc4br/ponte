@@ -23,6 +23,8 @@ class SearchCriteria:
 class BridgeRecord:
     values: dict[str, Any]
     source_row: int
+    source_file: str | None = None
+    source_sheet: str | None = None
 
     def get(self, key: str, default=None):
         return self.values.get(key, default)
