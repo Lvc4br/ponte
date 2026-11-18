@@ -10,6 +10,9 @@ import csv
 import hashlib
 import json
 import mimetypes
+import shutil
+import subprocess
+import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -48,7 +51,7 @@ class DocumentScanner:
 
     MAX_FILE_SIZE = 512 * 1024 * 1024
     SUPPORTED = {
-        ".pdf", ".docx", ".xlsx", ".xlsm", ".xls", ".pptx",
+        ".pdf", ".doc", ".docx", ".xlsx", ".xlsm", ".xls", ".pptx",
         ".csv", ".txt", ".md", ".json", ".xml", ".dxf",
         ".ifc", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp",
     }
@@ -107,6 +110,7 @@ class DocumentScanner:
         try:
             handler = {
                 ".pdf": self._pdf,
+                ".doc": self._doc,
                 ".docx": self._docx,
                 ".xlsx": self._excel,
                 ".xlsm": self._excel,
@@ -183,6 +187,38 @@ class DocumentScanner:
         finally:
             if document is not None:
                 document.close()
+
+    @staticmethod
+    def _doc(path: Path, result: DocumentScanResult) -> None:
+        """Extract legacy binary DOC through a locally installed LibreOffice."""
+        executable = shutil.which("soffice") or shutil.which("libreoffice")
+        if not executable:
+            result.warnings.append(
+                "DOC legado detectado, mas a leitura exige LibreOffice instalado. "
+                "Salve uma cópia como DOCX para leitura nativa."
+            )
+            return
+        with tempfile.TemporaryDirectory(prefix="ponte_doc_") as temporary:
+            output_dir = Path(temporary)
+            completed = subprocess.run(
+                [
+                    executable, "--headless", "--convert-to", "txt:Text",
+                    "--outdir", str(output_dir), str(path),
+                ],
+                capture_output=True, text=True, timeout=120, check=False,
+            )
+            output = output_dir / f"{path.stem}.txt"
+            if completed.returncode != 0 or not output.is_file():
+                detail = (completed.stderr or completed.stdout or "conversão não concluída").strip()
+                result.warnings.append(f"Não foi possível converter o DOC: {detail[:500]}")
+                return
+            content = output.read_text(encoding="utf-8", errors="replace")
+            result.metadata["converted_with"] = Path(executable).name
+            result.sections.append(ExtractedSection("text", "document:1", content))
+            result.warnings.append(
+                "DOC legado convertido localmente para texto; estrutura visual, tabelas "
+                "complexas e objetos incorporados podem não ser preservados."
+            )
 
     @staticmethod
     def _docx(path: Path, result: DocumentScanResult) -> None:
