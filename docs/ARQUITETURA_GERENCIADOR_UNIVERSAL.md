@@ -47,7 +47,7 @@ Não há equivalência total com Excel: sem VBA, macros, funções financeiras/e
 
 | Formato | Leitura inicial | Dependência/limite |
 |---|---|---|
-| PDF | Texto por página, metadados, campos, anexos listados e tabelas | OCR opcional via Tesseract; extração de tabelas via pdfplumber |
+| PDF | Texto por página, metadados, campos, anexos listados e tabelas | OCR via Tesseract (pipeline Windows tenta empacotar mecanismo e idioma português); extração de tabelas via pdfplumber |
 | DOCX | Parágrafos, tabelas, cabeçalhos e rodapés | Comentários, revisões e objetos incorporados não são completos |
 | DOC/PPT/RTF/ODT/ODP | Conversão para texto | LibreOffice instalado; layout pode ser perdido |
 | XLSX/XLSM | Abas, células e fórmulas como expressões | Macros não executadas; objetos avançados não extraídos |
