@@ -461,6 +461,7 @@ class WorkspaceStore:
                     for dependency in engine.dependencies(formula_column["formula"])
                 }
                 value = engine.evaluate(formula_column["formula"], context)
+                self._validate_value(name, formula_column["data_type"], value, False)
                 resolving.remove(name)
                 resolved[name] = value
                 return value
