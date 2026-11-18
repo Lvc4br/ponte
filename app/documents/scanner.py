@@ -160,6 +160,8 @@ class DocumentScanner:
             "page_count": len(reader.pages),
             "document_info": {str(k): str(v) for k, v in (reader.metadata or {}).items()},
             "encrypted": bool(reader.is_encrypted),
+            "form_fields": reader.get_fields() or {},
+            "attachments": sorted((reader.attachments or {}).keys()),
         })
         if reader.is_encrypted:
             result.warnings.append("PDF protegido por senha; conteúdo não extraído.")
@@ -177,6 +179,18 @@ class DocumentScanner:
                     result.warnings.append(f"Página {index}: {warning}")
                 elif not ocr_text:
                     result.warnings.append(f"Página {index} sem texto reconhecido por OCR.")
+        try:
+            import pdfplumber
+            with pdfplumber.open(path) as pdf:
+                for page_number, page in enumerate(pdf.pages, start=1):
+                    for table_number, table in enumerate(page.extract_tables() or [], start=1):
+                        result.sections.append(ExtractedSection(
+                            "pdf_table", f"page:{page_number}:table:{table_number}", table
+                        ))
+        except ImportError:
+            result.warnings.append("Extração de tabelas PDF indisponível; instale pdfplumber.")
+        except Exception as exc:
+            result.warnings.append(f"Extração de tabelas PDF incompleta: {exc}")
 
     @staticmethod
     def _ocr_pdf_page(path: Path, page_index: int) -> tuple[str, str | None]:
