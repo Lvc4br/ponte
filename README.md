@@ -8,7 +8,10 @@ O objetivo é centralizar e facilitar a organização, consulta e manutenção d
 
 ### Implementado na branch main
 
-- Aplicativo desktop Windows desenvolvido em Python e PySide6.\n- Workspace redesenhado para gestão de dados de obras, com tema escuro, navegação lateral, grade de registros inspirada em planilhas e painel de propriedades.
+- Aplicativo desktop Windows desenvolvido em Python e PySide6.\n- Workspace redesenhado para gestão de dados de obras, com tema escuro, navegação lateral, abas independentes para base principal e cada planilha Excel importada, grade de registros e painel de propriedades.
+- Navegação persistente entre planilhas importadas, identificadas pelo arquivo de origem e nome da aba; a visualização Todas reúne os registros da base.
+- Importação de abas diferentes do mesmo arquivo Excel, com bloqueio de reimportação da mesma combinação arquivo/aba por SHA-256.
+- Migração automática do SQLite para armazenar a origem dos registros, preservando os registros existentes.
 - Leitura de base SQL local, aceitando tabelas obras e analise_oaes.
 - Armazenamento da base ativa em SQLite local.
 - Consulta com filtros por tipo de obra, largura, vão e comprimento total.
@@ -18,7 +21,7 @@ O objetivo é centralizar e facilitar a organização, consulta e manutenção d
 - Preservação de campos adicionais, valores ausentes e intervalos textuais.
 - Registros sem dimensões verificáveis não são tratados como correspondências confirmadas quando o filtro correspondente está ativo.
 - Resumo da consulta e estatísticas descritivas para indicadores disponíveis.
-- Testes locais no Windows: 40 aprovados.
+- Testes locais no Windows: validação anterior de 40 testes aprovados; as novas alterações de navegação e migração aguardam a execução atualizada do CI.
 - Testes automatizados no GitHub Actions para Windows e Ubuntu, Python 3.11, 3.12 e 3.13 (6/6 ambientes aprovados).
 - Validação funcional no Windows pelo usuário: pesquisa, importação Excel e estatísticas confirmadas funcionando.
 - Pipeline de empacotamento para Windows x64 com PyInstaller.
