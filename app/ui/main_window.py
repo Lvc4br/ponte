@@ -17,6 +17,7 @@ from app.data.excel_importer import read_excel
 from app.data.repository import SQLRepository
 from app.services.search_service import SearchService
 from app.documents.scanner import DocumentScanner
+from app.documents.index import DocumentIndex
 from app.ui.document_scan_dialog import DocumentScanDialog
 
 
@@ -118,6 +119,7 @@ class MainWindow(QMainWindow):
         self.resize(1540, 920)
         self.setMinimumSize(1120, 700)
         self.repo = SQLRepository()
+        self.document_index = DocumentIndex()
         self.service = SearchService()
         self.results = []
         self._records_by_id = {}
@@ -533,6 +535,14 @@ class MainWindow(QMainWindow):
     def _show_document_scan_results(self, results):
         self.scan_progress.close()
         self.last_document_scan_results = results
+        try:
+            for result in results:
+                self.document_index.index_result(result)
+        except Exception as exc:
+            QMessageBox.warning(
+                self, "Catálogo documental",
+                f"Os arquivos foram analisados, mas houve falha ao salvar o catálogo local: {exc}",
+            )
         dialog = DocumentScanDialog(results, self)
         dialog.exec()
         self.statusBar().showMessage(
