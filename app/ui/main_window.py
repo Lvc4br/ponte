@@ -15,6 +15,7 @@ from app.core.models import NumericRange, SearchCriteria
 from app.core.validation import format_display_value, parse_input_number
 from app.data.excel_importer import read_excel
 from app.data.repository import SQLRepository
+from app.data.backup_manager import DatabaseBackupManager
 from app.services.search_service import SearchService
 from app.documents.scanner import DocumentScanner
 from app.documents.index import DocumentIndex
@@ -167,6 +168,10 @@ class MainWindow(QMainWindow):
         actions_menu.addAction("Analisar pasta inteira...", self.scan_document_folder)
         actions_menu.addAction("Biblioteca documental", self.open_document_library)
         actions_menu.addAction("Espaço de dados (projetos e tabelas)", self.open_workspace)
+        actions_menu.addSeparator()
+        actions_menu.addAction("Criar backup do banco...", self.create_database_backup)
+        actions_menu.addAction("Verificar backup...", self.verify_database_backup)
+        actions_menu.addAction("Restaurar backup...", self.restore_database_backup)
         actions_menu.addSeparator()
         actions_menu.addAction("Excluir registros selecionados", self.delete_selected)
         self.actions_button.setMenu(actions_menu)
@@ -524,6 +529,68 @@ class MainWindow(QMainWindow):
     def open_workspace(self):
         dialog = WorkspaceDialog(self.workspace_store, self.document_index, self)
         dialog.exec()
+
+    def create_database_backup(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Criar backup do banco", "PONTE-backup.sqlite3",
+            "Banco SQLite (*.sqlite3)"
+        )
+        if not path:
+            return
+        if not path.lower().endswith(".sqlite3"):
+            path += ".sqlite3"
+        try:
+            result = DatabaseBackupManager(self.workspace_store.path).create_backup(path)
+            QMessageBox.information(
+                self, "Backup concluído",
+                f"Backup verificado e criado.\n\nArquivo: {result['path']}\n"
+                f"Tamanho: {result['size_bytes']:,} bytes\nSHA-256: {result['sha256']}"
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Falha no backup", str(exc))
+
+    def verify_database_backup(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Verificar backup", "", "Banco SQLite (*.sqlite3)"
+        )
+        if not path:
+            return
+        try:
+            result = DatabaseBackupManager(self.workspace_store.path).verify_backup(path)
+            QMessageBox.information(
+                self, "Backup íntegro",
+                f"Integridade SQLite: {result['integrity']}\n"
+                f"Tabelas: {result['table_count']}\n"
+                f"Tamanho: {result['size_bytes']:,} bytes\nSHA-256: {result['sha256']}"
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Backup inválido", str(exc))
+
+    def restore_database_backup(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Selecionar backup para restauração", "", "Banco SQLite (*.sqlite3)"
+        )
+        if not path:
+            return
+        answer = QMessageBox.warning(
+            self, "Confirmar restauração",
+            "A restauração substituirá o banco local atual. Um backup de segurança "
+            "do banco atual será criado automaticamente. Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            result = DatabaseBackupManager(self.workspace_store.path).restore(path)
+            safety = result["safety_backup"]["path"] if result["safety_backup"] else "não necessário"
+            QMessageBox.information(
+                self, "Restauração concluída",
+                f"Banco restaurado e verificado.\nBackup de segurança: {safety}\n\n"
+                "Feche e abra novamente o PONTE para recarregar todos os dados."
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Falha na restauração", str(exc))
 
     def scan_documents(self):
         paths, _ = QFileDialog.getOpenFileNames(
