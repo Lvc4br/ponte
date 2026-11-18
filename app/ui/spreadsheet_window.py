@@ -361,10 +361,15 @@ class SpreadsheetWindow(QMainWindow):
                 self._filters[name] = {
                     value for value in values if text.casefold() in value.casefold()
                 }
+                self._conditions.pop(name, None)
+        elif chosen == condition_action:
+            self._set_column_condition(column)
         elif chosen == all_action:
             self._filters.pop(name, None)
+            self._conditions.pop(name, None)
         elif chosen == clear_action:
             self._filters.pop(name, None)
+            self._conditions.pop(name, None)
         elif chosen in value_actions:
             new_selected = set(selected)
             for action, value in value_actions.items():
@@ -376,6 +381,7 @@ class SpreadsheetWindow(QMainWindow):
                 self._filters.pop(name, None)
             else:
                 self._filters[name] = new_selected
+            self._conditions.pop(name, None)
         else:
             return
         self._refresh_grid()
@@ -412,7 +418,17 @@ class SpreadsheetWindow(QMainWindow):
             record_id = self.grid.item(item.row(), 0).data(Qt.ItemDataRole.UserRole)
             column = self.columns[item.column() - 1]
             value = self._parse_value(item.text(), column["data_type"])
+            previous = item.data(Qt.ItemDataRole.UserRole + 1)
             self.store.update_record(record_id, {column["name"]: value})
+            if str(previous) != item.text():
+                old_value = self._parse_value(str(previous), column["data_type"]) if previous != "" else None
+                self._undo_stack.append({
+                    "record_id": record_id, "column": column["name"],
+                    "old": old_value, "new": value,
+                })
+                self._undo_stack = self._undo_stack[-self._history_limit:]
+                self._redo_stack.clear()
+            item.setData(Qt.ItemDataRole.UserRole + 1, item.text())
             self.status.setText(f"Registro {record_id} salvo automaticamente.")
         except Exception as exc:
             QMessageBox.warning(self, "Valor inválido", str(exc))
@@ -562,8 +578,97 @@ class SpreadsheetWindow(QMainWindow):
             except Exception as exc:
                 QMessageBox.warning(self, "Exportar Excel", str(exc))
 
+    @staticmethod
+    def _matches_condition(value, operator, target):
+        if value is None:
+            return operator == "está vazio"
+        if operator == "não está vazio":
+            return True
+        if operator == "contém":
+            return str(target).casefold() in str(value).casefold()
+        if operator == "começa com":
+            return str(value).casefold().startswith(str(target).casefold())
+        if operator == "igual a":
+            return value == target
+        if operator == "diferente de":
+            return value != target
+        if operator == "maior que":
+            return value > target
+        if operator == "maior ou igual a":
+            return value >= target
+        if operator == "menor que":
+            return value < target
+        if operator == "menor ou igual a":
+            return value <= target
+        return False
+
+    def _set_column_condition(self, column):
+        name, kind = column["name"], column["data_type"]
+        if kind in {"integer", "decimal"}:
+            operators = ["igual a", "diferente de", "maior que", "maior ou igual a",
+                         "menor que", "menor ou igual a", "está vazio", "não está vazio"]
+        elif kind in {"date", "datetime"}:
+            operators = ["igual a", "diferente de", "depois de", "antes de",
+                         "está vazio", "não está vazio"]
+        elif kind == "boolean":
+            operators = ["igual a", "diferente de", "está vazio", "não está vazio"]
+        else:
+            operators = ["contém", "começa com", "igual a", "diferente de",
+                         "está vazio", "não está vazio"]
+        operator, ok = QInputDialog.getItem(
+            self, "Filtro por condição", f"Condição para “{name}”:", operators, 0, False
+        )
+        if not ok:
+            return
+        target = None
+        if operator not in {"está vazio", "não está vazio"}:
+            raw, ok = QInputDialog.getText(self, "Valor do filtro", f"Valor ({kind}):")
+            if not ok:
+                return
+            try:
+                if kind in {"integer", "decimal", "boolean"}:
+                    target = self._parse_value(raw, kind)
+                elif kind in {"date", "datetime"}:
+                    target = raw.strip()
+                    from datetime import date, datetime
+                    parser = datetime.fromisoformat if kind == "datetime" else date.fromisoformat
+                    parser(target)
+                else:
+                    target = raw
+                if operator == "depois de":
+                    operator = "maior que"
+                elif operator == "antes de":
+                    operator = "menor que"
+                self._conditions[name] = (operator, target)
+                self._filters.pop(name, None)
+                self._refresh_grid()
+            except Exception as exc:
+                QMessageBox.warning(self, "Filtro inválido", str(exc))
+
+    def _apply_history_entry(self, entry, value, destination):
+        try:
+            if not self.store.update_record(entry["record_id"], {entry["column"]: value}):
+                raise ValueError("O registro não existe mais.")
+            destination.append(entry)
+            self._refresh_grid()
+        except Exception as exc:
+            QMessageBox.warning(self, "Histórico", f"Não foi possível aplicar a alteração: {exc}")
+
+    def _undo(self):
+        if not self._undo_stack:
+            return
+        entry = self._undo_stack.pop()
+        self._apply_history_entry(entry, entry["old"], self._redo_stack)
+
+    def _redo(self):
+        if not self._redo_stack:
+            return
+        entry = self._redo_stack.pop()
+        self._apply_history_entry(entry, entry["new"], self._undo_stack)
+
     def _clear_filters(self):
         self._filters.clear()
+        self._conditions.clear()
         self.search_input.clear()
         self._sort_column = None
         self._sort_descending = False
