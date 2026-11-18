@@ -335,6 +335,11 @@ class SpreadsheetWindow(QMainWindow):
         self.table_id = self.table_combo.currentData()
         self._filters.clear()
         self._conditions.clear()
+        self._technical_criteria.clear()
+        self.type_filter_input.clear()
+        for minimum, maximum in self.technical_filter_inputs.values():
+            minimum.clear()
+            maximum.clear()
         self._refresh_grid()
         self._refresh_documents()
 
@@ -342,6 +347,11 @@ class SpreadsheetWindow(QMainWindow):
         self.table_id = self.table_combo.currentData() if index >= 0 else None
         self._filters.clear()
         self._conditions.clear()
+        self._technical_criteria.clear()
+        self.type_filter_input.clear()
+        for minimum, maximum in self.technical_filter_inputs.values():
+            minimum.clear()
+            maximum.clear()
         self._refresh_grid()
 
     def _technical_filter_criteria(self):
