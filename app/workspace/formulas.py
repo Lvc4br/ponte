@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import operator
+import re
 from typing import Any
 
 
@@ -49,10 +50,21 @@ class FormulaEngine:
     MAX_EXPRESSION_LENGTH = 2048
     MAX_POWER = 12
 
-    def dependencies(self, expression: str) -> set[str]:
+    @staticmethod
+    def _prepare(expression: str):
         source = expression.strip()
         if source.startswith("="):
             source = source[1:].strip()
+        references = {}
+        def replace_reference(match):
+            token = f"__ponte_ref_{len(references)}"
+            references[token] = match.group(1).strip()
+            return token
+        source = re.sub(r"\\[([^\\[\\]]+)\\]", replace_reference, source)
+        return source, references
+
+    def dependencies(self, expression: str) -> set[str]:
+        source, references = self._prepare(expression)
         try:
             tree = ast.parse(source, mode="eval")
         except SyntaxError as exc:
@@ -61,22 +73,26 @@ class FormulaEngine:
             node.func.id for node in ast.walk(tree)
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
         }
-        return {
+        names = {
             node.id for node in ast.walk(tree)
             if isinstance(node, ast.Name) and node.id not in function_names
         }
+        return {references.get(name, name) for name in names}
 
     def evaluate(self, expression: str, context: dict[str, Any] | None = None):
         if not isinstance(expression, str):
             raise TypeError("A fórmula deve ser texto.")
-        source = expression.strip()
-        if source.startswith("="):
-            source = source[1:].strip()
+        source, references = self._prepare(expression)
         if not source or len(source) > self.MAX_EXPRESSION_LENGTH:
             raise FormulaError("Fórmula vazia ou acima do limite permitido.")
         try:
             tree = ast.parse(source, mode="eval")
-            return self._node(tree.body, context or {})
+            values = dict(context or {})
+            for token, column_name in references.items():
+                if column_name not in values:
+                    raise FormulaError(f"Referência desconhecida: {column_name}")
+                values[token] = values[column_name]
+            return self._node(tree.body, values)
         except FormulaError:
             raise
         except Exception as exc:
