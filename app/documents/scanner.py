@@ -51,9 +51,10 @@ class DocumentScanner:
 
     MAX_FILE_SIZE = 512 * 1024 * 1024
     SUPPORTED = {
-        ".pdf", ".doc", ".docx", ".xlsx", ".xlsm", ".xls", ".pptx",
-        ".csv", ".txt", ".md", ".json", ".xml", ".dxf",
-        ".ifc", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp",
+        ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".rtf", ".odt", ".odp",
+        ".xlsx", ".xlsm", ".xls", ".xlsb", ".csv", ".txt", ".md", ".json",
+        ".xml", ".dxf", ".dwg", ".ifc", ".png", ".jpg", ".jpeg", ".tif",
+        ".tiff", ".bmp", ".webp", ".gif",
     }
 
     def scan_many(self, paths: list[str | Path]) -> list[DocumentScanResult]:
@@ -110,18 +111,24 @@ class DocumentScanner:
         try:
             handler = {
                 ".pdf": self._pdf,
-                ".doc": self._doc,
+                ".doc": self._office_text,
                 ".docx": self._docx,
+                ".ppt": self._office_text,
+                ".pptx": self._pptx,
+                ".rtf": self._office_text,
+                ".odt": self._office_text,
+                ".odp": self._office_text,
                 ".xlsx": self._excel,
                 ".xlsm": self._excel,
                 ".xls": self._xls,
-                ".pptx": self._pptx,
+                ".xlsb": self._xlsb,
                 ".csv": self._csv,
                 ".txt": self._text,
                 ".md": self._text,
                 ".json": self._text,
                 ".xml": self._text,
                 ".dxf": self._dxf,
+                ".dwg": self._dwg,
                 ".ifc": self._ifc,
                 ".png": self._image,
                 ".jpg": self._image,
@@ -129,6 +136,8 @@ class DocumentScanner:
                 ".tif": self._image,
                 ".tiff": self._image,
                 ".bmp": self._image,
+                ".webp": self._image,
+                ".gif": self._image,
             }[extension]
             handler(path, result)
             if result.errors:
@@ -181,7 +190,11 @@ class DocumentScanner:
             document = pdfium.PdfDocument(str(path))
             page = document[page_index]
             image = page.render(scale=2).to_pil()
-            return pytesseract.image_to_string(image), None
+            try:
+                text = pytesseract.image_to_string(image, lang="por+eng")
+            except Exception:
+                text = pytesseract.image_to_string(image, lang="eng")
+            return text, None
         except Exception as exc:
             return "", f"falha no OCR ({exc})."
         finally:
@@ -189,13 +202,13 @@ class DocumentScanner:
                 document.close()
 
     @staticmethod
-    def _doc(path: Path, result: DocumentScanResult) -> None:
+    def _office_text(path: Path, result: DocumentScanResult) -> None:
         """Extract legacy binary DOC through a locally installed LibreOffice."""
         executable = shutil.which("soffice") or shutil.which("libreoffice")
         if not executable:
             result.warnings.append(
-                "DOC legado detectado, mas a leitura exige LibreOffice instalado. "
-                "Salve uma cópia como DOCX para leitura nativa."
+                f"{path.suffix.upper()} detectado, mas a leitura exige LibreOffice instalado "
+                "ou conversão prévia para um formato suportado."
             )
             return
         with tempfile.TemporaryDirectory(prefix="ponte_doc_") as temporary:
@@ -216,8 +229,8 @@ class DocumentScanner:
             result.metadata["converted_with"] = Path(executable).name
             result.sections.append(ExtractedSection("text", "document:1", content))
             result.warnings.append(
-                "DOC legado convertido localmente para texto; estrutura visual, tabelas "
-                "complexas e objetos incorporados podem não ser preservados."
+                f"{path.suffix.upper()} convertido localmente para texto; estrutura visual, "
+                "tabelas complexas, notas e objetos incorporados podem não ser preservados."
             )
 
     @staticmethod
@@ -292,6 +305,27 @@ class DocumentScanner:
         result.warnings.append("O formato XLS legado não expõe fórmulas com a mesma fidelidade do XLSX.")
 
     @staticmethod
+    def _xlsb(path: Path, result: DocumentScanResult) -> None:
+        try:
+            from pyxlsb import open_workbook
+        except ImportError:
+            result.warnings.append("Leitor XLSB ausente; instale pyxlsb para habilitar o formato.")
+            return
+        with open_workbook(str(path)) as workbook:
+            result.metadata.update({
+                "sheet_names": list(workbook.sheets),
+                "sheet_count": len(workbook.sheets),
+            })
+            for sheet_name in workbook.sheets:
+                with workbook.get_sheet(sheet_name) as sheet:
+                    rows = [[cell.v for cell in row] for row in sheet.rows()]
+                result.sections.append(ExtractedSection(
+                    "worksheet", f"sheet:{sheet_name}",
+                    {"title": sheet_name, "rows": rows},
+                ))
+        result.warnings.append("XLSB: fórmulas, macros e objetos incorporados não são executados.")
+
+    @staticmethod
     def _pptx(path: Path, result: DocumentScanResult) -> None:
         from pptx import Presentation
 
@@ -360,7 +394,10 @@ class DocumentScanner:
                 "image_mode": image.mode,
             })
             try:
-                text = pytesseract.image_to_string(image)
+                try:
+                    text = pytesseract.image_to_string(image, lang="por+eng")
+                except Exception:
+                    text = pytesseract.image_to_string(image, lang="eng")
                 result.sections.append(ExtractedSection("ocr_text", "image:1", text))
             except Exception as exc:
                 result.warnings.append(
@@ -389,6 +426,37 @@ class DocumentScanner:
             "entity_count": len(entities),
         })
         result.sections.append(ExtractedSection("cad_entities", "modelspace", entities))
+
+    @staticmethod
+    def _dwg(path: Path, result: DocumentScanResult) -> None:
+        """Convert DWG to DXF using an optional ODA File Converter installation."""
+        executable = shutil.which("ODAFileConverter") or shutil.which("ODAFileConverter.exe")
+        if not executable:
+            result.warnings.append(
+                "DWG detectado, mas exige ODA File Converter instalado. "
+                "Também é possível exportar o desenho para DXF."
+            )
+            return
+        with tempfile.TemporaryDirectory(prefix="ponte_dwg_") as temporary:
+            root = Path(temporary)
+            source_dir, target_dir = root / "source", root / "target"
+            source_dir.mkdir()
+            target_dir.mkdir()
+            shutil.copy2(path, source_dir / path.name)
+            completed = subprocess.run(
+                [executable, str(source_dir), str(target_dir), "ACAD2018", "DXF", "0", "1"],
+                capture_output=True, text=True, timeout=300, check=False,
+            )
+            converted = target_dir / f"{path.stem}.dxf"
+            if completed.returncode != 0 or not converted.is_file():
+                detail = (completed.stderr or completed.stdout or "conversão não concluída").strip()
+                result.warnings.append(f"Falha na conversão DWG: {detail[:500]}")
+                return
+            result.metadata["converted_with"] = Path(executable).name
+            DocumentScanner._dxf(converted, result)
+            result.warnings.append(
+                "DWG convertido para DXF por ferramenta externa; confirme fidelidade de entidades e cotas."
+            )
 
     @staticmethod
     def _ifc(path: Path, result: DocumentScanResult) -> None:
