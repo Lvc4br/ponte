@@ -1,13 +1,13 @@
 # Situação do projeto
 
-**Projeto:** Consulta de Taxas de Pontes  
-**Categoria:** aplicativo desktop de organização e consulta de dados técnicos de engenharia  
-**Foco atual:** registros de pontes/obras de arte especiais e indicadores de materiais, incluindo dados de concreto e aço  
+**Projeto:** Gestão de Obras  
+**Categoria:** aplicativo desktop de gerenciamento de dados de obras de engenharia  
+**Foco dos dados atuais:** registros de pontes/obras de arte especiais e indicadores de materiais; objetivo do produto ampliado para gestão de dados de obras  
 **Branch principal:** main
 
 ## Implementado na branch main
 
-- [x] Aplicativo desktop Windows com Python/PySide6.
+- [x] Aplicativo desktop Windows com Python/PySide6.\n- [x] Interface reorganizada como workspace de gestão de obras: tema escuro, navegação lateral, grade tabular e painel de propriedades.
 - [x] Leitura de dados SQL locais das tabelas obras e analise_oaes.
 - [x] Persistência local da base ativa em SQLite.
 - [x] Filtros por tipo de obra, largura, vão e comprimento.
@@ -30,9 +30,9 @@
 
 O pacote v0.1.0 é anterior às funcionalidades mais recentes da branch main. Não o apresentar como contendo importação Excel, exclusão de registros ou as correções recentes de pesquisa.
 
-## Administração de documentos e planilhas: escopo atual
+## Gestão de dados e administração de planilhas: escopo atual
 
-O aplicativo já permite administrar registros tabulares provenientes de SQL e Excel. Ainda não é um GED: não guarda nem classifica arquivos técnicos anexos, não controla versões documentais, não possui aprovação, permissões por perfil ou auditoria de alterações.
+O aplicativo já permite gerenciar registros tabulares de obras provenientes de SQL e Excel, consultar dimensões, manter a base local e visualizar indicadores disponíveis. Ainda não é um GED: não guarda nem classifica arquivos técnicos anexos, não controla versões documentais, não possui aprovação, permissões por perfil ou auditoria de alterações.
 
 ## Próximas etapas
 
