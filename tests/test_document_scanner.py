@@ -195,3 +195,28 @@ def test_rejects_highly_compressed_office_archive(tmp_path):
     result = DocumentScanner().scan(source)
     assert result.status == "error"
     assert "compressão suspeita" in result.errors[0]
+
+
+def test_batch_scanner_reports_progress_for_each_file(tmp_path):
+    folder = tmp_path / "progress"
+    folder.mkdir()
+    (folder / "a.txt").write_text("A", encoding="utf-8")
+    (folder / "b.txt").write_text("B", encoding="utf-8")
+    updates = []
+    results = DocumentScanner().scan_many(
+        [folder], progress_callback=lambda current, total, name: updates.append((current, total, name))
+    )
+    assert len(results) == 2
+    assert updates[0] == (0, 2, "")
+    assert updates[-1] == (2, 2, "b.txt")
+
+
+def test_batch_scanner_honors_cancel_before_start(tmp_path):
+    from threading import Event
+    folder = tmp_path / "cancel"
+    folder.mkdir()
+    (folder / "a.txt").write_text("A", encoding="utf-8")
+    cancellation = Event()
+    cancellation.set()
+    results = DocumentScanner().scan_many([folder], cancel_event=cancellation)
+    assert results == []
