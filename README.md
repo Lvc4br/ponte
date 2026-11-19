@@ -1,3 +1,21 @@
+# PONTE — Banco Central de Dados de Engenharia | EGT
+
+> **Direção do rebuild:** aplicação desktop para a EGT, com API central e PostgreSQL, iniciando pelo domínio de pontes/OAE e preparada para 30+ usuários simultâneos.
+
+A documentação oficial desta nova direção está em [docs/EGT](docs/EGT/README.md). Ela define visão de produto, arquitetura de implantação, modelo de dados, plano de desenvolvimento e política de limpeza do repositório.
+
+**Atenção:** o código existente neste branch é a base legada em avaliação. Ele não deve ser considerado a arquitetura final do rebuild. A nova aplicação será construída em etapas, mantendo o sistema e os dados anteriores preservados até a validação da migração.
+
+## Decisões do rebuild
+- Cliente: desktop Python/PySide6.
+- Comunicação: cliente desktop → API central (FastAPI) → PostgreSQL.
+- Concorrência alvo: 30+ usuários, validada por teste de carga.
+- Domínio inicial: pontes e obras de arte especiais.
+- Documentos: metadados relacionais e binários em armazenamento corporativo.
+- Segurança: autenticação, autorização no servidor e auditoria.
+
+## Documentação legada
+
 # Gerenciador de Estruturas
 
 Aplicativo desktop para gerenciamento de projetos, tabelas, dados técnicos e documentos, com foco em fluxos de trabalho de engenharia. O nome PONTE permanece como origem histórica do projeto; a aplicação não fica limitada a pontes.
