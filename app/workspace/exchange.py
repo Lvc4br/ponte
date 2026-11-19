@@ -31,6 +31,18 @@ class SpreadsheetExchange:
         return "text"
 
     @staticmethod
+    def _detect_header_row(rows, scan_limit=25):
+        """Detect headers below sparse/grouped title rows in Excel sheets."""
+        if not rows:
+            return 0
+        first_count = sum(value is not None and str(value).strip() for value in rows[0])
+        best_index, best_count = 0, first_count
+        for index, row in enumerate(rows[1:scan_limit], start=1):
+            count = sum(value is not None and str(value).strip() for value in row)
+            if count > best_count:
+                best_index, best_count = index, count
+        return best_index if best_count >= first_count + 2 else 0
+    @staticmethod
     def _unique_headers(headers):
         result, counts = [], {}
         for index, header in enumerate(headers, start=1):
@@ -147,8 +159,9 @@ class SpreadsheetExchange:
                         rows.pop()
                     if not rows:
                         continue
+                    header_index = self._detect_header_row(rows)
                     created.append(self._create_from_rows(
-                        project_id, sheet.title, rows[0], rows[1:],
+                        project_id, sheet.title, rows[header_index], rows[header_index + 1:],
                         f"Importado de {path.name}, aba {sheet.title}",
                     ))
                 return created
@@ -187,8 +200,9 @@ class SpreadsheetExchange:
                                 row.append(cell.value)
                         rows.append(row)
                     if rows:
+                        header_index = self._detect_header_row(rows)
                         created.append(self._create_from_rows(
-                            project_id, name, rows[0], rows[1:],
+                            project_id, name, rows[header_index], rows[header_index + 1:],
                             f"Importado de {path.name}, aba {name}",
                         ))
                 return created
@@ -213,8 +227,9 @@ class SpreadsheetExchange:
                     with workbook.get_sheet(name) as sheet:
                         rows = [[cell.v for cell in row] for row in sheet.rows()]
                     if rows:
+                        header_index = self._detect_header_row(rows)
                         created.append(self._create_from_rows(
-                            project_id, name, rows[0], rows[1:],
+                            project_id, name, rows[header_index], rows[header_index + 1:],
                             f"Importado de {path.name}, aba {name}",
                         ))
                 return created
