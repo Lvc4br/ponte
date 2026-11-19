@@ -7,6 +7,7 @@ Esta pasta define a direção do novo produto corporativo PONTE.
 - [Plano de desenvolvimento](PLANO_DESENVOLVIMENTO.md)
 - [Modelo de dados inicial](MODELO_DADOS.md)
 - [Política de inventário e limpeza](LIMPEZA_REPOSITORIO.md)
+- [Entrega desktop em executável único](ENTREGA_DESKTOP_ONEFILE.md)
 
 ## Decisões estabelecidas
 
