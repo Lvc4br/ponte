@@ -11,7 +11,7 @@ import unicodedata
 
 
 ALIASES = {
-    "type_obra": ("tipo_obra", "tipo de obra", "tipo obra", "obra tipo", "obra"),
+    "type_obra": ("tipo_obra", "tipo de obra", "tipo obra", "obra tipo"),
     "width": ("largura_m", "largura", "largura (m)", "width", "width_m"),
     "length": (
         "compr_obra_m", "compr_obra", "comprimento_obra_m", "comprimento total",
