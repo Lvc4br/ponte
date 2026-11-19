@@ -62,6 +62,23 @@ class SpreadsheetExchange:
             )
 
     def _create_from_rows(self, project_id, name, headers, rows, description=""):
+        # Drop completely empty columns; keep unnamed columns that contain data.
+        headers = list(headers)
+        rows = [list(row) for row in rows]
+        width = max([len(headers)] + [len(row) for row in rows])
+        headers.extend([None] * (width - len(headers)))
+        rows = [row + [None] * (width - len(row)) for row in rows]
+        keep_indexes = [
+            index for index in range(width)
+            if (headers[index] is not None and str(headers[index]).strip())
+            or any(row[index] is not None and str(row[index]).strip() for row in rows)
+        ]
+        headers = [
+            headers[index] if headers[index] is not None and str(headers[index]).strip()
+            else f"Coluna {index + 1}"
+            for index in keep_indexes
+        ]
+        rows = [[row[index] for index in keep_indexes] for row in rows]
         headers = self._unique_headers(headers)
         self._assert_table_name_available(project_id, name)
         table_id = self.store.create_table(project_id, name, description)
