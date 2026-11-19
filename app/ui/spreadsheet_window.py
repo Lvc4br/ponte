@@ -144,10 +144,16 @@ class SpreadsheetWindow(QMainWindow):
         self.project_combo = QComboBox()
         self.project_combo.currentIndexChanged.connect(self._project_changed)
         selectors.addWidget(self.project_combo, 2)
+        delete_project_button = QPushButton("Excluir projeto")
+        delete_project_button.clicked.connect(self._delete_project)
+        selectors.addWidget(delete_project_button)
         selectors.addWidget(QLabel("Tabela"))
         self.table_combo = QComboBox()
         self.table_combo.currentIndexChanged.connect(self._table_changed)
         selectors.addWidget(self.table_combo, 2)
+        delete_table_button = QPushButton("Excluir tabela")
+        delete_table_button.clicked.connect(self._delete_table)
+        selectors.addWidget(delete_table_button)
         selectors.addWidget(QLabel("Localizar"))
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Pesquisar em todas as colunas…")
@@ -304,11 +310,11 @@ class SpreadsheetWindow(QMainWindow):
         self.setStyleSheet(STYLE + "\\nQWidget#filterBar { background:#293543; border:1px solid #3b4b5c; border-radius:4px; }")
         self.statusBar().showMessage("Banco local preservado · alterações salvas automaticamente")
 
-    def _load_projects(self, selected=None):
+    def _load_projects(self, selected=None, create_default=True):
         self.project_combo.blockSignals(True)
         self.project_combo.clear()
         projects = self.store.list_projects()
-        if not projects:
+        if not projects and create_default:
             project_id = self.store.create_project("Meu espaço de dados")
             projects = self.store.list_projects()
             selected = project_id
@@ -321,6 +327,14 @@ class SpreadsheetWindow(QMainWindow):
 
     def _project_changed(self, index):
         if index < 0:
+            self.project_id = None
+            self.table_id = None
+            self.project_label.setText("Nenhum projeto selecionado")
+            self.table_combo.blockSignals(True)
+            self.table_combo.clear()
+            self.table_combo.blockSignals(False)
+            self._refresh_grid()
+            self._refresh_documents()
             return
         self.project_id = self.project_combo.currentData()
         self.project_label.setText(self.project_combo.currentText())
@@ -631,6 +645,47 @@ class SpreadsheetWindow(QMainWindow):
                 self.table_combo.setCurrentIndex(self.table_combo.findData(table_id))
             except Exception as exc:
                 QMessageBox.warning(self, "Tabela", str(exc))
+
+    def _delete_project(self):
+        if self.project_id is None:
+            return
+        name = self.project_combo.currentText()
+        answer = QMessageBox.warning(
+            self, "Excluir projeto",
+            "Excluir permanentemente o projeto '{}' e todas as tabelas, colunas e registros associados?\n\nEsta ação não pode ser desfeita.".format(name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            if not self.store.delete_project(self.project_id):
+                raise RuntimeError("O projeto não foi encontrado.")
+            self._load_projects(create_default=False)
+            self.statusBar().showMessage("Projeto '{}' excluído.".format(name))
+        except Exception as exc:
+            QMessageBox.critical(self, "Erro ao excluir projeto", str(exc))
+
+    def _delete_table(self):
+        if self.table_id is None:
+            return
+        name = self.table_combo.currentText()
+        count = len(self.store.list_records(self.table_id))
+        answer = QMessageBox.warning(
+            self, "Excluir tabela",
+            "Excluir permanentemente a tabela '{}' e seus {} registros?\n\nEsta ação não pode ser desfeita.".format(name, count),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            if not self.store.delete_table(self.table_id):
+                raise RuntimeError("A tabela não foi encontrada.")
+            self._project_changed(self.project_combo.currentIndex())
+            self.statusBar().showMessage("Tabela '{}' excluída.".format(name))
+        except Exception as exc:
+            QMessageBox.critical(self, "Erro ao excluir tabela", str(exc))
 
     def _new_column(self):
         if self.table_id is None:
