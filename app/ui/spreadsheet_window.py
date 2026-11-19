@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from app.documents.index import DocumentIndex
 from app.workspace.exchange import SpreadsheetExchange
+from app.workspace.batch_edit import SpreadsheetBatchEditor
 from app.workspace.store import WorkspaceStore
 from app.workspace.spreadsheet import matches_condition, parse_cell_value
 from app.workspace.technical_filters import matches_technical_filters, parse_filter_number
@@ -48,6 +49,7 @@ class SpreadsheetGrid(QTableWidget):
 
     undo_requested = Signal()
     redo_requested = Signal()
+    paste_requested = Signal(int, int, str)
 
     def keyPressEvent(self, event):
         if event.matches(QKeySequence.StandardKey.Undo):
@@ -72,17 +74,10 @@ class SpreadsheetGrid(QTableWidget):
             return
         if event.matches(QKeySequence.StandardKey.Paste):
             raw = QApplication.clipboard().text()
-            if not raw:
-                return
-            start_row, start_col = max(0, self.currentRow()), max(1, self.currentColumn())
-            for row_offset, line in enumerate(raw.splitlines()):
-                for col_offset, value in enumerate(line.split("\t")):
-                    row, col = start_row + row_offset, start_col + col_offset
-                    if row >= self.rowCount() or col >= self.columnCount():
-                        continue
-                    target = self.item(row, col)
-                    if target is not None and target.flags() & Qt.ItemFlag.ItemIsEditable:
-                        target.setText(value)
+            if raw:
+                self.paste_requested.emit(
+                    max(0, self.currentRow()), max(1, self.currentColumn()), raw
+                )
             return
         if event.matches(QKeySequence.StandardKey.SelectAll):
             self.selectAll()
@@ -101,6 +96,7 @@ class SpreadsheetWindow(QMainWindow):
         self.store = WorkspaceStore()
         self.documents = DocumentIndex()
         self.exchange = SpreadsheetExchange(self.store)
+        self.batch_editor = SpreadsheetBatchEditor(self.store)
         self.project_id = None
         self.table_id = None
         self.columns = []
@@ -250,6 +246,7 @@ class SpreadsheetWindow(QMainWindow):
         self.grid.currentCellChanged.connect(self._selection_changed)
         self.grid.undo_requested.connect(self._undo)
         self.grid.redo_requested.connect(self._redo)
+        self.grid.paste_requested.connect(self._paste_cells)
 
         docs_split = QSplitter(Qt.Orientation.Vertical)
         docs_split.addWidget(self.grid)
@@ -518,6 +515,49 @@ class SpreadsheetWindow(QMainWindow):
         else:
             return
         self._refresh_grid()
+
+    def _paste_cells(self, start_row, start_col, raw):
+        """Paste a TSV block as one validated SQLite transaction."""
+        if self.table_id is None or not raw:
+            return
+        changes = {}
+        history = []
+        try:
+            for row_offset, line in enumerate(raw.splitlines()):
+                for col_offset, text in enumerate(line.split("\\t")):
+                    row, col = start_row + row_offset, start_col + col_offset
+                    if row >= self.grid.rowCount() or col >= self.grid.columnCount():
+                        continue
+                    item = self.grid.item(row, col)
+                    if item is None or not (item.flags() & Qt.ItemFlag.ItemIsEditable):
+                        continue
+                    record_id = self.grid.item(row, 0).data(Qt.ItemDataRole.UserRole)
+                    column = self.columns[col - 1]
+                    value = self._parse_value(text, column["data_type"])
+                    previous = item.data(Qt.ItemDataRole.UserRole + 1)
+                    if previous == value:
+                        continue
+                    changes.setdefault(record_id, {})[column["name"]] = value
+                    history.append({
+                        "record_id": record_id, "column": column["name"],
+                        "old": previous, "new": value,
+                    })
+            if not changes:
+                return
+            result = self.batch_editor.update_records(self.table_id, changes)
+            self._undo_stack.extend(history)
+            self._undo_stack = self._undo_stack[-self._history_limit:]
+            self._redo_stack.clear()
+            self._refresh_grid()
+            self.status.setText(
+                f"Colagem concluída: {len(history)} célula(s) em "
+                f"{result.updated_count} registro(s), em uma única transação."
+            )
+        except Exception as exc:
+            QMessageBox.warning(
+                self, "Colagem não aplicada",
+                f"Nenhuma alteração foi salva. Verifique os valores e tipos das colunas.\\n\\n{exc}"
+            )
 
     def _selection_changed(self, row, column, *_):
         if row < 0 or column <= 0:
