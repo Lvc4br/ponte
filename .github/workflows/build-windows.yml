@@ -2,9 +2,9 @@ name: Validação e pacote Windows
 
 on:
   push:
-    branches: [main]
+    branches: [main, "feature/document-control-spreadsheet-review", "feature/three-column-engineering-dashboard"]
   pull_request:
-    branches: [main]
+    branches: [main, "feature/document-control-spreadsheet-review", "feature/three-column-engineering-dashboard"]
   workflow_dispatch:
 
 concurrency:
