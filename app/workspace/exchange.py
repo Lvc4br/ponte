@@ -35,10 +35,10 @@ class SpreadsheetExchange:
         """Detect headers below sparse/grouped title rows in Excel sheets."""
         if not rows:
             return 0
-        first_count = sum(value is not None and str(value).strip() for value in rows[0])
+        first_count = sum(bool(value is not None and str(value).strip()) for value in rows[0])
         best_index, best_count = 0, first_count
         for index, row in enumerate(rows[1:scan_limit], start=1):
-            count = sum(value is not None and str(value).strip() for value in row)
+            count = sum(bool(value is not None and str(value).strip()) for value in row)
             if count > best_count:
                 best_index, best_count = index, count
         return best_index if best_count >= first_count + 2 else 0
