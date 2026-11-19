@@ -6,14 +6,15 @@ their original headers without losing filter compatibility.
 from __future__ import annotations
 
 import math
+import re
 import unicodedata
 
 
 ALIASES = {
-    "type_obra": ("tipo_obra", "tipo de obra", "tipo obra", "obra tipo"),
+    "type_obra": ("tipo_obra", "tipo de obra", "tipo obra", "obra tipo", "obra"),
     "width": ("largura_m", "largura", "largura (m)", "width", "width_m"),
     "length": (
-        "compr_obra_m", "comprimento_obra_m", "comprimento total",
+        "compr_obra_m", "compr_obra", "comprimento_obra_m", "comprimento total",
         "comprimento total (m)", "comprimento", "comprimento da obra m",
         "total_length", "total length",
     ),
@@ -64,12 +65,18 @@ def _value(values: dict, aliases: tuple[str, ...]):
 
 def _within(value, minimum, maximum) -> bool:
     number = parse_filter_number(value)
-    if number is None:
+    if number is not None:
+        return (minimum is None or number >= minimum) and (maximum is None or number <= maximum)
+    # Aceita vãos armazenados como intervalo, por exemplo: 41,25 - 41,80.
+    if value is None:
         return False
-    return (minimum is None or number >= minimum) and (
-        maximum is None or number <= maximum
-    )
-
+    raw_numbers = re.findall(r'\d+(?:[.,]\d+)?', str(value))
+    numbers = [parse_filter_number(item) for item in raw_numbers]
+    numbers = [item for item in numbers if item is not None]
+    if not numbers:
+        return False
+    low, high = min(numbers), max(numbers)
+    return (maximum is None or low <= maximum) and (minimum is None or high >= minimum)
 
 def matches_technical_filters(values: dict, criteria: dict) -> bool:
     """Return whether one row satisfies the active technical criteria."""
