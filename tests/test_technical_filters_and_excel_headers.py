@@ -44,5 +44,5 @@ def test_span_filter_rejects_non_overlapping_interval():
     )
 
 
-def test_type_filter_accepts_obra_column_as_fallback():
-    assert matches_technical_filters({"obra": "Ponte estaiada"}, {"type_obra": "estaiada"})
+def test_type_filter_uses_explicit_type_column():
+    assert matches_technical_filters({"tipo_obra": "Ponte estaiada"}, {"type_obra": "estaiada"})
