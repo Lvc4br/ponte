@@ -38,7 +38,21 @@ def test_delete_table_removes_its_columns_and_records(tmp_path):
 
 
 def test_delete_project_removes_its_tables_and_records(tmp_path):
-    store = WorkspaceStore(tmp_path / "workspace.sqlite3")
+    import sqlite3
+
+    database = tmp_path / "workspace.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute("""
+            CREATE TABLE documents (
+                id INTEGER PRIMARY KEY,
+                file_name TEXT NOT NULL,
+                extension TEXT,
+                sha256 TEXT,
+                status TEXT,
+                scanned_at TEXT
+            )
+        """)
+    store = WorkspaceStore(database)
     project_id = store.create_project("Projeto")
     table_id = store.create_table(project_id, "Base")
     store.add_column(table_id, "obra", "integer")
