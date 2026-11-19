@@ -25,7 +25,7 @@ class WorkspaceDialog(QDialog):
         self.columns = []
         self._loading = False
         self.setWindowTitle("PONTE | Espaço de dados")
-        self.resize(1150, 720)
+        self.resize(1320, 820)
 
 
         self.setMinimumSize(980, 650)
@@ -228,6 +228,8 @@ class WorkspaceDialog(QDialog):
             self.grid.clear()
             self.grid.setRowCount(0)
             self.grid.setColumnCount(0)
+            self.grid_count.setText("Nenhuma tabela neste projeto")
+            self._refresh_project_documents()
 
     def _table_changed(self, index):
         if index < 0:
@@ -267,7 +269,7 @@ class WorkspaceDialog(QDialog):
                 self.grid.setItem(row_index, column_index, item)
         self._loading = False
         self.grid_count.setText(f"{len(records)} registros · {len(self.columns)} colunas")
-        self.status.setText("Alterações salvas no armazenamento local.")
+        self.status.setText("Banco local SQLite · alterações persistidas automaticamente.")
 
     def _add_project(self):
         name, ok = QInputDialog.getText(self, "Novo projeto", "Nome do projeto:")
