@@ -6,8 +6,9 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
-    QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPlainTextEdit,
-    QPushButton, QScrollArea, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QGroupBox, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit,
+    QMessageBox, QPlainTextEdit, QPushButton, QScrollArea, QTabWidget,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from app.workspace.exchange import SpreadsheetExchange
@@ -26,59 +27,171 @@ class WorkspaceDialog(QDialog):
         self.setWindowTitle("PONTE | Espaço de dados")
         self.resize(1150, 720)
 
+
+        self.setMinimumSize(980, 650)
+        self.setStyleSheet("""
+            QDialog { background: #171c24; color: #e8edf4; }
+            QLabel { color: #e3e9f1; }
+            QLabel#eyebrow { color: #e6a04b; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+            QLabel#muted { color: #9aa8b8; }
+            QFrame#header, QGroupBox { background: #202936; border: 1px solid #344254; border-radius: 8px; }
+            QGroupBox { margin-top: 10px; padding: 12px 8px 8px 8px; font-weight: 700; color: #dce5ef; }
+            QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 5px; }
+            QComboBox, QLineEdit, QPlainTextEdit { background: #151d28; color: #edf2f8; border: 1px solid #405168; border-radius: 6px; padding: 8px; min-height: 20px; }
+            QComboBox:focus, QLineEdit:focus, QPlainTextEdit:focus { border: 1px solid #d9903e; }
+            QPushButton { background: #2d3b4c; color: #edf2f8; border: 1px solid #43566d; border-radius: 6px; padding: 8px 12px; min-height: 20px; }
+            QPushButton:hover { background: #3a4b60; border-color: #d9903e; }
+            QPushButton#primary { background: #b97532; border-color: #d9903e; color: white; font-weight: 700; }
+            QPushButton#primary:hover { background: #cb8740; }
+            QTabWidget::pane { border: 1px solid #344254; border-radius: 7px; background: #1c2531; top: -1px; }
+            QTabBar::tab { background: #263343; color: #aebccc; padding: 10px 18px; margin-right: 3px; border: 1px solid #344254; border-bottom: 0; }
+            QTabBar::tab:selected { background: #1c2531; color: #f0b15f; border-top: 2px solid #df9848; }
+            QTableWidget { background: #18212c; alternate-background-color: #202c39; color: #e5ebf2; gridline-color: #344254; border: 1px solid #344254; selection-background-color: #654a2f; selection-color: white; }
+            QHeaderView::section { background: #2c3b4d; color: #e8edf4; padding: 9px; border: 0; border-right: 1px solid #405168; border-bottom: 1px solid #405168; font-weight: 700; }
+        """)
         root = QVBoxLayout(self)
-        project_row = QHBoxLayout()
-        project_row.addWidget(QLabel("Projeto"))
+        root.setContentsMargins(16, 14, 16, 14)
+        root.setSpacing(11)
+
+        header = QFrame()
+        header.setObjectName("header")
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(16, 12, 16, 12)
+        identity = QVBoxLayout()
+        title = QLabel("PONTE  /  ESPAÇO DE TRABALHO")
+        title.setObjectName("eyebrow")
+        identity.addWidget(title)
+        subtitle = QLabel("Organize dados, tabelas e documentos em um único projeto.")
+        subtitle.setObjectName("muted")
+        identity.addWidget(subtitle)
+        header_layout.addLayout(identity, 1)
+        project_controls = QVBoxLayout()
+        project_label = QLabel("PROJETO ATUAL")
+        project_label.setObjectName("eyebrow")
+        project_controls.addWidget(project_label)
         self.projects = QComboBox()
+        self.projects.setMinimumWidth(210)
         self.projects.currentIndexChanged.connect(self._project_changed)
-        project_row.addWidget(self.projects, 1)
-        self.add_project_button = QPushButton("Novo projeto")
+        project_controls.addWidget(self.projects)
+        header_layout.addLayout(project_controls)
+        self.add_project_button = QPushButton("＋ Novo projeto")
+        self.add_project_button.setObjectName("primary")
         self.add_project_button.clicked.connect(self._add_project)
-        project_row.addWidget(self.add_project_button)
+        header_layout.addWidget(self.add_project_button)
         rename_project = QPushButton("Renomear")
         rename_project.clicked.connect(self._rename_project)
-        project_row.addWidget(rename_project)
-        delete_project = QPushButton("Excluir projeto")
+        header_layout.addWidget(rename_project)
+        delete_project = QPushButton("Excluir")
         delete_project.clicked.connect(self._delete_project)
-        project_row.addWidget(delete_project)
-        root.addLayout(project_row)
+        header_layout.addWidget(delete_project)
+        root.addWidget(header)
 
-        table_row = QHBoxLayout()
-        table_row.addWidget(QLabel("Tabela"))
+        table_group = QGroupBox("TABELA ATUAL")
+        table_row = QHBoxLayout(table_group)
         self.tables = QComboBox()
+        self.tables.setMinimumWidth(230)
         self.tables.currentIndexChanged.connect(self._table_changed)
         table_row.addWidget(self.tables, 1)
-        action_row = QHBoxLayout()
-        actions = (
-            ("Nova tabela", self._add_table),
-            ("Renomear tabela", self._rename_table),
-            ("Excluir tabela", self._delete_table),
-            ("Nova coluna", self._add_column),
-            ("Coluna calculada", self._add_formula_column),
-            ("Excluir coluna", self._delete_column),
-            ("Novo registro", self._add_record),
-            ("Excluir registro", self._delete_record),
-            ("Importar CSV", self._import_csv),
-            ("Importar Excel", self._import_xlsx),
-            ("Exportar CSV", self._export_csv),
-            ("Exportar Excel", self._export_xlsx),
-            ("Vincular documento", self._link_document),
-            ("Documentos do projeto", self._show_project_documents),
-        )
-        for index, (label, callback) in enumerate(actions):
+        for label, callback in (("＋ Nova tabela", self._add_table), ("Renomear", self._rename_table), ("Excluir", self._delete_table)):
             button = QPushButton(label)
             button.clicked.connect(callback)
-            (table_row if index < 7 else action_row).addWidget(button)
-        root.addLayout(table_row)
-        root.addLayout(action_row)
+            table_row.addWidget(button)
+        root.addWidget(table_group)
 
+        toolbar = QHBoxLayout()
+        toolbar.setSpacing(8)
+        groups = [
+            ("ESTRUTURA", [("＋ Coluna", self._add_column), ("ƒ Coluna calculada", self._add_formula_column), ("Excluir coluna", self._delete_column)]),
+            ("REGISTROS", [("＋ Registro", self._add_record), ("Excluir registro", self._delete_record)]),
+            ("INTERCÂMBIO", [("Importar CSV", self._import_csv), ("Importar Excel", self._import_xlsx), ("Exportar CSV", self._export_csv), ("Exportar Excel", self._export_xlsx)]),
+        ]
+        for group_title, actions in groups:
+            group = QGroupBox(group_title)
+            group_layout = QHBoxLayout(group)
+            group_layout.setContentsMargins(8, 10, 8, 7)
+            group_layout.setSpacing(5)
+            for label, callback in actions:
+                button = QPushButton(label)
+                button.clicked.connect(callback)
+                group_layout.addWidget(button)
+            toolbar.addWidget(group, 1)
+        root.addLayout(toolbar)
+
+        self.tabs = QTabWidget()
+        data_page = QWidget()
+        data_layout = QVBoxLayout(data_page)
+        data_layout.setContentsMargins(10, 10, 10, 10)
+        data_heading = QHBoxLayout()
+        data_title = QLabel("DADOS DA TABELA")
+        data_title.setObjectName("eyebrow")
+        data_heading.addWidget(data_title)
+        data_heading.addStretch()
+        self.grid_count = QLabel("Selecione uma tabela")
+        self.grid_count.setObjectName("muted")
+        data_heading.addWidget(self.grid_count)
+        data_layout.addLayout(data_heading)
         self.grid = QTableWidget()
         self.grid.setAlternatingRowColors(True)
-        self.grid.setSortingEnabled(False)
+        self.grid.setSortingEnabled(True)
+        self.grid.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.grid.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
+        self.grid.setWordWrap(False)
+        self.grid.verticalHeader().setDefaultSectionSize(34)
+        self.grid.verticalHeader().setVisible(True)
+        self.grid.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.grid.horizontalHeader().setDefaultSectionSize(150)
+        self.grid.horizontalHeader().setMinimumSectionSize(90)
+        self.grid.horizontalHeader().setStretchLastSection(True)
         self.grid.cellChanged.connect(self._cell_changed)
-        root.addWidget(self.grid, 1)
+        data_layout.addWidget(self.grid, 1)
+        self.tabs.addTab(data_page, "▦  Dados")
+
+        documents_page = QWidget()
+        documents_layout = QVBoxLayout(documents_page)
+        documents_layout.setContentsMargins(12, 12, 12, 12)
+        documents_header = QHBoxLayout()
+        documents_intro = QVBoxLayout()
+        documents_title = QLabel("DOCUMENTOS DO PROJETO")
+        documents_title.setObjectName("eyebrow")
+        documents_intro.addWidget(documents_title)
+        documents_hint = QLabel("Consulte os arquivos analisados e vinculados ao projeto selecionado.")
+        documents_hint.setObjectName("muted")
+        documents_hint.setWordWrap(True)
+        documents_intro.addWidget(documents_hint)
+        documents_header.addLayout(documents_intro, 1)
+        link_button = QPushButton("＋ Vincular documento")
+        link_button.setObjectName("primary")
+        link_button.clicked.connect(self._link_document)
+        documents_header.addWidget(link_button)
+        refresh_documents = QPushButton("Atualizar")
+        refresh_documents.clicked.connect(self._refresh_project_documents)
+        documents_header.addWidget(refresh_documents)
+        documents_layout.addLayout(documents_header)
+        self.documents_table = QTableWidget(0, 4)
+        self.documents_table.setHorizontalHeaderLabels(["Documento", "Formato", "Situação", "Analisado em"])
+        self.documents_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.documents_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.documents_table.setAlternatingRowColors(True)
+        self.documents_table.verticalHeader().setVisible(False)
+        self.documents_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.documents_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.documents_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.documents_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        documents_layout.addWidget(self.documents_table, 1)
+        self.documents_status = QLabel("Os documentos originais permanecem inalterados.")
+        self.documents_status.setObjectName("muted")
+        documents_layout.addWidget(self.documents_status)
+        self.tabs.addTab(documents_page, "▤  Documentos")
+        root.addWidget(self.tabs, 1)
+
+        footer = QHBoxLayout()
         self.status = QLabel("Os dados são armazenados localmente no SQLite.")
-        root.addWidget(self.status)
+        self.status.setObjectName("muted")
+        footer.addWidget(self.status, 1)
+        local_badge = QLabel("●  ARMAZENAMENTO LOCAL")
+        local_badge.setObjectName("eyebrow")
+        footer.addWidget(local_badge)
+        root.addLayout(footer)
         self._refresh_projects()
 
     def _refresh_projects(self, select_id=None):
@@ -153,9 +266,8 @@ class WorkspaceDialog(QDialog):
                     item.setToolTip(f"Fórmula: {column['formula']}")
                 self.grid.setItem(row_index, column_index, item)
         self._loading = False
-        self.status.setText(
-            f"{len(records)} registro(s) · {len(self.columns)} coluna(s) · armazenamento local"
-        )
+        self.grid_count.setText(f"{len(records)} registros · {len(self.columns)} colunas")
+        self.status.setText("Alterações salvas no armazenamento local.")
 
     def _add_project(self):
         name, ok = QInputDialog.getText(self, "Novo projeto", "Nome do projeto:")
@@ -494,21 +606,33 @@ class WorkspaceDialog(QDialog):
         try:
             self.store.link_document(self.project_id, document["id"])
             self.status.setText(f"Documento vinculado: {document['file_name']}")
+            self._refresh_project_documents()
         except Exception as exc:
             QMessageBox.warning(self, "Vincular documento", str(exc))
 
-    def _show_project_documents(self):
+    def _refresh_project_documents(self):
+        self.documents_table.setRowCount(0)
         if self.project_id is None:
+            self.documents_status.setText("Nenhum projeto selecionado.")
             return
         documents = self.store.list_project_documents(self.project_id)
-        if not documents:
-            QMessageBox.information(self, "Documentos do projeto", "Nenhum documento vinculado.")
-            return
-        lines = [
-            f"{item['file_name']} · {item['extension']} · {item['status']} · {item['scanned_at']}"
-            for item in documents
-        ]
-        QMessageBox.information(self, "Documentos do projeto", "\n".join(lines))
+        self.documents_table.setRowCount(len(documents))
+        for row, document in enumerate(documents):
+            values = [
+                document.get("file_name", ""),
+                document.get("extension", ""),
+                document.get("status", ""),
+                document.get("scanned_at", ""),
+            ]
+            for column, value in enumerate(values):
+                self.documents_table.setItem(row, column, QTableWidgetItem(str(value or "—")))
+        self.documents_status.setText(
+            f"{len(documents)} documento(s) vinculado(s) · os arquivos originais não são modificados."
+        )
+
+    def _show_project_documents(self):
+        self._refresh_project_documents()
+        self.tabs.setCurrentIndex(1)
 
     def _export_csv(self):
         if self.table_id is None:
