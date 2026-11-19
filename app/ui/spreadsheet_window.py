@@ -90,7 +90,7 @@ class SpreadsheetWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PONTE | Espaço de trabalho")
+        self.setWindowTitle("Gerenciador de Estruturas | Espaço de trabalho")
         self.resize(1580, 960)
         self.setMinimumSize(1100, 680)
         self.store = WorkspaceStore()
@@ -110,7 +110,6 @@ class SpreadsheetWindow(QMainWindow):
         self._sort_column = None
         self._sort_descending = False
         self._technical_criteria = {}
-        self._legacy_window = None
         self._pdf_document = None
         self._pdf_page_index = 0
         self._scan_worker = None
@@ -129,10 +128,10 @@ class SpreadsheetWindow(QMainWindow):
         ribbon_layout = QVBoxLayout(ribbon)
         ribbon_layout.setContentsMargins(14, 9, 14, 10)
         brand_row = QHBoxLayout()
-        brand = QLabel("PONTE")
+        brand = QLabel("GERENCIADOR DE ESTRUTURAS")
         brand.setObjectName("brand")
         brand_row.addWidget(brand)
-        brand_row.addWidget(QLabel("GERENCIADOR DE DADOS E DOCUMENTOS"))
+        brand_row.addWidget(QLabel("DADOS, PLANILHAS E DOCUMENTOS"))
         brand_row.addStretch()
         self.project_label = QLabel("Projeto local")
         self.project_label.setObjectName("muted")
@@ -174,7 +173,6 @@ class SpreadsheetWindow(QMainWindow):
             ("Importar Excel", self._import_excel),
             ("Exportar Excel", self._export_excel),
             ("Documentos +", self._link_document),
-            ("Base legada", self._open_legacy),
         ]
         for label, callback in buttons:
             button = QPushButton(label)
@@ -1082,7 +1080,7 @@ class SpreadsheetWindow(QMainWindow):
         available = self.documents.list_documents()
         if not available:
             QMessageBox.information(
-                self, "Documentos", "Nenhum documento foi analisado ainda. Use a janela Base legada para iniciar a análise documental."
+                self, "Documentos", "Nenhum documento foi analisado ainda. Use o botão Analisar arquivos para iniciar a análise documental."
             )
             return
         labels = [f"{doc['file_name']} · {doc['status']} · ID {doc['id']}" for doc in available]
@@ -1102,13 +1100,4 @@ class SpreadsheetWindow(QMainWindow):
         elif document:
             QMessageBox.warning(self, "Arquivo não encontrado", document["path"])
 
-    def _open_legacy(self):
-        try:
-            from app.ui.main_window import MainWindow
-            self._legacy_window = MainWindow()
-            self._legacy_window.show()
-            self._legacy_window.raise_()
-            self._legacy_window.activateWindow()
-        except Exception as exc:
-            QMessageBox.warning(self, "Base legada", str(exc))
 
