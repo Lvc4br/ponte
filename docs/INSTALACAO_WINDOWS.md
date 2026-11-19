@@ -1,30 +1,38 @@
-# Instalação — PONTE Gerenciador Universal de Dados e Documentos
+# Instalação — PONTE Windows (arquivo único)
 
-## Pacote Windows
+## Entrega
 
-O pacote de validação será produzido pelo workflow [Validação e pacote Windows](../.github/workflows/build-windows.yml). Ele deve gerar o artefato `PONTE-Windows-Python313`. Não use artefatos antigos para atualizar a instalação.
+A distribuição desta branch é **um único arquivo: `PONTE.exe`**. Não é necessário instalar Python, abrir scripts ou copiar uma pasta de bibliotecas. O workflow [Validação e executável Windows único](../.github/workflows/build-windows.yml) publica o artefato `PONTE-Windows-OneFile`.
 
-O executável é `PONTE.exe`. Extraia o pacote em uma pasta com permissão de gravação.
+Baixe somente o artefato gerado pelo workflow desta branch. Builds antigos no formato `onedir` não atendem ao requisito.
 
-## Dependências externas opcionais do scanner
+## Como usar
 
-- **Tesseract OCR:** o pipeline Windows tenta incluir o executável e o idioma português no pacote. Se o pacote não contiver Tesseract, instale-o no Windows e inclua os idiomas português e inglês. Builds locais copiam a instalação encontrada em Program Files.
-- **LibreOffice:** necessário para ler DOC/PPT/RTF/ODT/ODP legados por conversão local.
-- **ODA File Converter:** necessário para conversão DWG para DXF.
-- **IfcOpenShell:** necessário para extração IFC avançada; depende de versão compatível com o Python usado no ambiente.
+1. Salve `PONTE.exe` em uma pasta na qual seu usuário tenha permissão de gravação (por exemplo, Documentos\PONTE).
+2. Execute o arquivo com duplo clique.
+3. Na primeira execução, o aplicativo poderá criar a pasta `data` ao lado do executável para manter o banco SQLite local.
+4. Não apague nem mova essa pasta enquanto quiser preservar os dados cadastrados. Para transferir a instalação, feche o PONTE e copie o executável e a pasta `data` juntos.
+5. Antes de atualizar, feche o aplicativo e faça backup da pasta `data`.
 
-Sem essas ferramentas, os arquivos correspondentes são identificados e o scanner registra avisos; não significa que o conteúdo foi integralmente lido.
+**Importante:** o pacote distribuído contém apenas o executável. Os dados criados durante o uso são arquivos locais de trabalho e não fazem parte do binário. Esta versão local não é ainda o banco central multiusuário da EGT e não deve ser usada como compartilhamento simultâneo de um SQLite em pasta de rede.
 
-## Backup e restauração\n\nUse as opções **Criar backup do banco**, **Verificar backup** e **Restaurar backup** no menu principal. O backup gera um arquivo SQLite e um manifesto JSON. A restauração verifica o arquivo e cria uma cópia de segurança do banco atual antes de substituí-lo. Feche e reabra o aplicativo após restaurar.\n\nConsulte [Plano de testes de usuário](PLANO_TESTES_USUARIO.md) antes de validar a versão atualizada.\n\n## Dados locais
+## Recursos externos opcionais
 
-- `data/registros.sqlite3`: banco ativo do aplicativo, incluindo dados legados, catálogo documental e workspace genérico.
-- `data/ponte.db`: base SQLite intermediária criada ao executar o SQL legado.
-- `database/ponte.sql`: SQL real privado; não é distribuído no repositório.
-- `database/ponte.sql.example`: modelo sem dados corporativos.
+Alguns formatos documentais dependem de ferramentas externas que não fazem parte do arquivo único:
+- LibreOffice para conversão de DOC/PPT/RTF/ODT/ODP legados.
+- ODA File Converter para conversão DWG para DXF.
+- IfcOpenShell para extração IFC avançada.
+- Tesseract OCR para reconhecimento de texto em imagens/PDFs digitalizados.
 
-Antes de atualizar, feche o aplicativo e faça cópia de segurança do diretório `data` e de `database/ponte.sql`. Nunca substitua os dados locais pelo conteúdo do pacote.
+Sem essas ferramentas, os recursos associados podem ficar indisponíveis; o cadastro, a consulta e os fluxos que não dependem delas continuam sujeitos aos testes da versão.
 
-## Instalação pelo código-fonte
+## Dados legados
+
+A aplicação pode procurar `database/ponte.sql` ao lado do executável para carregar uma fonte SQL legada. Esse arquivo não é incluído no executável e não deve ser distribuído sem autorização. Se a empresa precisar desse fluxo, a equipe deverá fornecer o arquivo aprovado separadamente.
+
+## Compilação para desenvolvimento
+
+No Windows, com Python 3.11+ e as dependências instaladas:
 
 ```powershell
 python -m venv .venv
@@ -32,15 +40,20 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m compileall -q app tests main.py
 .\.venv\Scripts\python.exe -m pytest -v
-.\.venv\Scripts\python.exe main.py
+.\build\build_windows.bat
 ```
 
-## Gerar executável
+O resultado esperado é `dist/PONTE.exe`, sem diretório `_internal` ou DLLs distribuídas separadamente.
 
-Execute `build/build_windows.bat`. O resultado esperado é `dist/PONTE/PONTE.exe`. O build coleta os módulos Python; ferramentas externas como Tesseract, LibreOffice e ODA File Converter não são incorporadas automaticamente.
+## Critérios obrigatórios antes de liberar para usuários
 
-## Cuidados
+- Workflow Windows concluído com testes aprovados.
+- Executável inicia em máquina Windows sem Python instalado.
+- Teste de criação, edição, fechamento e reabertura dos dados locais.
+- Teste de backup e restauração.
+- Teste de atualização sem perda dos dados.
+- Verificação de que o pacote contém somente `PONTE.exe`.
+- Identificação da versão e registro dos problemas conhecidos.
+- Teste em perfil de usuário sem privilégios administrativos.
 
-- Não coloque SQL real, SQLite com dados reais ou planilhas internas no GitHub.
-- Faça backup antes de mover, atualizar ou reinstalar o aplicativo.
-- O executável ainda precisa de smoke test em Windows limpo e não possui assinatura digital.
+O executável gerado por CI ainda precisa desses testes de aceitação em máquina Windows limpa antes de ser declarado pronto para produção.
