@@ -2,7 +2,7 @@
 
 > **Direção do rebuild:** aplicação desktop para a EGT, com API central e PostgreSQL, iniciando pelo domínio de pontes/OAE e preparada para 30+ usuários simultâneos.
 
-A documentação oficial desta nova direção está em [docs/EGT](docs/EGT/README.md). Ela define visão de produto, arquitetura de implantação, modelo de dados, plano de desenvolvimento e política de limpeza do repositório.
+A documentação oficial desta nova direção está em [docs/EGT](docs/EGT/README.md). Ela define visão de produto, arquitetura de implantação, modelo de dados, plano de desenvolvimento e política de limpeza do repositório. O processo da entrega desktop em arquivo único está em [Entrega desktop — One File](docs/EGT/ENTREGA_DESKTOP_ONEFILE.md).
 
 **Atenção:** o código existente neste branch é a base legada em avaliação. Ele não deve ser considerado a arquitetura final do rebuild. A nova aplicação será construída em etapas, mantendo o sistema e os dados anteriores preservados até a validação da migração.
 
@@ -14,7 +14,7 @@ A documentação oficial desta nova direção está em [docs/EGT](docs/EGT/READM
 - Documentos: metadados relacionais e binários em armazenamento corporativo.
 - Segurança: autenticação, autorização no servidor e auditoria.
 
-## Documentação legada
+## Entrega desktop Windows\n\nEsta branch prepara o empacotamento como **um único arquivo PONTE.exe** (PyInstaller One File). Consulte [Instalação Windows](docs/INSTALACAO_WINDOWS.md). O executável gerado ainda precisa passar pelos testes em máquina Windows limpa antes de ser considerado liberado. A versão local usa SQLite e não é ainda o banco central multiusuário da EGT.\n\n## Documentação legada
 
 # Gerenciador de Estruturas
 
