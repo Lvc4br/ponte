@@ -31,6 +31,18 @@ class SpreadsheetExchange:
         return "text"
 
     @staticmethod
+    def _detect_header_row(rows, scan_limit=25):
+        """Detect headers below sparse/grouped title rows in Excel sheets."""
+        if not rows:
+            return 0
+        first_count = sum(bool(value is not None and str(value).strip()) for value in rows[0])
+        best_index, best_count = 0, first_count
+        for index, row in enumerate(rows[1:scan_limit], start=1):
+            count = sum(bool(value is not None and str(value).strip()) for value in row)
+            if count > best_count:
+                best_index, best_count = index, count
+        return best_index if best_count >= first_count + 2 else 0
+    @staticmethod
     def _unique_headers(headers):
         result, counts = [], {}
         for index, header in enumerate(headers, start=1):
@@ -50,6 +62,23 @@ class SpreadsheetExchange:
             )
 
     def _create_from_rows(self, project_id, name, headers, rows, description=""):
+        # Drop completely empty columns; keep unnamed columns that contain data.
+        headers = list(headers)
+        rows = [list(row) for row in rows]
+        width = max([len(headers)] + [len(row) for row in rows])
+        headers.extend([None] * (width - len(headers)))
+        rows = [row + [None] * (width - len(row)) for row in rows]
+        keep_indexes = [
+            index for index in range(width)
+            if (headers[index] is not None and str(headers[index]).strip())
+            or any(row[index] is not None and str(row[index]).strip() for row in rows)
+        ]
+        headers = [
+            headers[index] if headers[index] is not None and str(headers[index]).strip()
+            else f"Coluna {index + 1}"
+            for index in keep_indexes
+        ]
+        rows = [[row[index] for index in keep_indexes] for row in rows]
         headers = self._unique_headers(headers)
         self._assert_table_name_available(project_id, name)
         table_id = self.store.create_table(project_id, name, description)
@@ -147,8 +176,9 @@ class SpreadsheetExchange:
                         rows.pop()
                     if not rows:
                         continue
+                    header_index = self._detect_header_row(rows)
                     created.append(self._create_from_rows(
-                        project_id, sheet.title, rows[0], rows[1:],
+                        project_id, sheet.title, rows[header_index], rows[header_index + 1:],
                         f"Importado de {path.name}, aba {sheet.title}",
                     ))
                 return created
@@ -187,8 +217,9 @@ class SpreadsheetExchange:
                                 row.append(cell.value)
                         rows.append(row)
                     if rows:
+                        header_index = self._detect_header_row(rows)
                         created.append(self._create_from_rows(
-                            project_id, name, rows[0], rows[1:],
+                            project_id, name, rows[header_index], rows[header_index + 1:],
                             f"Importado de {path.name}, aba {name}",
                         ))
                 return created
@@ -213,8 +244,9 @@ class SpreadsheetExchange:
                     with workbook.get_sheet(name) as sheet:
                         rows = [[cell.v for cell in row] for row in sheet.rows()]
                     if rows:
+                        header_index = self._detect_header_row(rows)
                         created.append(self._create_from_rows(
-                            project_id, name, rows[0], rows[1:],
+                            project_id, name, rows[header_index], rows[header_index + 1:],
                             f"Importado de {path.name}, aba {name}",
                         ))
                 return created

@@ -1,10 +1,13 @@
 import sys
+
 from PySide6.QtWidgets import QApplication
-from app.ui.main_window import MainWindow
+
+from app.ui.spreadsheet_window import SpreadsheetWindow
+
 
 def main() -> int:
     app = QApplication(sys.argv)
-    app.setApplicationName('PONTE')
-    window = MainWindow()
+    app.setApplicationName("Gerenciador de Estruturas")
+    window = SpreadsheetWindow()
     window.show()
     return app.exec()
