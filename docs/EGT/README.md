@@ -6,6 +6,8 @@ Esta pasta define a direção do novo produto corporativo PONTE.
 - [Arquitetura de implantação](ARQUITETURA_IMPLANTACAO.md)
 - [Plano de desenvolvimento](PLANO_DESENVOLVIMENTO.md)
 - [Modelo de dados inicial](MODELO_DADOS.md)
+- [Núcleo de domínio de pontes](DOMINIO_PONTES.md)
+- [Status da fundação de domínio](STATUS_DOMINIO.md)
 - [Política de inventário e limpeza](LIMPEZA_REPOSITORIO.md)
 
 ## Decisões estabelecidas
