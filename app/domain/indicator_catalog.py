@@ -26,7 +26,7 @@ def legacy_indicator_catalog() -> tuple[IndicatorDefinition, ...]:
         IndicatorDefinition(
             code="Ecm",
             name="Ecm — indicador legado",
-            unit="m³/m² (provisória)",
+            unit="m³/m²",
             description="Unidade citada como referência no projeto; confirmar a notação e a definição técnica antes de utilizar.",
             status=IndicatorStatus.DRAFT,
         ),
