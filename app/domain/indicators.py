@@ -84,10 +84,22 @@ class IndicatorResult:
     note: str = ""
 
     def __post_init__(self):
-        if isinstance(self.definition_version, bool) or self.definition_version < 1:
+        if isinstance(self.definition_version, bool) or not isinstance(self.definition_version, int) or self.definition_version < 1:
             raise ValueError("A versão da definição é obrigatória.")
         if not self.unit.strip():
             raise ValueError("A unidade do resultado é obrigatória.")
+        for field_name in ("value", "numerator_value", "denominator_value"):
+            raw = getattr(self, field_name)
+            if raw is not None:
+                try:
+                    number = Decimal(str(raw))
+                except Exception:
+                    raise ValueError(f"{field_name}: valor numérico inválido.") from None
+                if not number.is_finite():
+                    raise ValueError(f"{field_name}: o valor precisa ser finito.")
+                object.__setattr__(self, field_name, number)
+        if self.denominator_value == Decimal("0"):
+            raise ValueError("O denominador do indicador não pode ser zero.")
         if self.status == IndicatorValueStatus.UNAVAILABLE and self.value is not None:
             raise ValueError("Resultado indisponível não pode possuir valor numérico.")
         if self.status in {IndicatorValueStatus.CALCULATED, IndicatorValueStatus.APPROVED} and self.value is None:
