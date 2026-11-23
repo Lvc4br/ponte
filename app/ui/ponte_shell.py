@@ -353,34 +353,100 @@ class PonteMainWindow(QMainWindow):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        intro = QLabel("Visão consolidada dos empreendimentos. Cadastre projetos e acompanhe sua estrutura local.")
+        intro = QLabel(
+            "Pesquise, filtre e acompanhe empreendimentos e contratos aos quais as OAEs estão vinculadas."
+        )
         intro.setObjectName("sectionIntro")
+        intro.setWordWrap(True)
         layout.addWidget(intro)
-        projects = self.store.list_projects()
+        self.project_rows = self.store.list_projects()
         cards = self._metric_row([
-            MetricCard("Projetos cadastrados", str(len(projects)), "Registros no workspace"),
-            MetricCard("OAEs vinculadas", "Não apurado", "Vínculo projeto–OAE ainda não integrado"),
-            MetricCard("Em execução", "Não apurado", "Etapas ainda não estruturadas"),
-            MetricCard("Com pendências", "Não apurado", "Validação ainda não integrada"),
+            MetricCard("Projetos cadastrados", str(len(self.project_rows)), "Registros no workspace local"),
+            MetricCard("OAEs vinculadas", "Não apurado", "Relacionamento projeto–OAE ainda não integrado"),
+            MetricCard("Em execução", "Não apurado", "Etapas não estruturadas no cadastro atual"),
+            MetricCard("Com pendências", "Não apurado", "Validação de empreendimentos ainda não integrada"),
         ])
         layout.addWidget(cards)
-        panel = Panel("Empreendimentos cadastrados", "Dados efetivamente gravados no workspace local")
+
+        panel = Panel("Empreendimentos cadastrados", "Dados locais • campos não cadastrados permanecem como “Não informado”")
+        toolbar = QHBoxLayout()
+        self.project_search = QLineEdit()
+        self.project_search.setPlaceholderText("Buscar projeto, contrato ou responsável…")
+        self.project_search.textChanged.connect(self._filter_project_rows)
+        toolbar.addWidget(self.project_search, 2)
+        self.project_status_filter = QComboBox()
+        self.project_status_filter.addItem("Todos os status", "")
+        self.project_responsible_filter = QComboBox()
+        self.project_responsible_filter.addItem("Todos os responsáveis", "")
+        statuses = set()
+        responsibles = set()
+        for project in self.project_rows:
+            metadata = project.get("metadata") or {}
+            status = metadata.get("status")
+            responsible = metadata.get("responsible", metadata.get("responsavel"))
+            if status:
+                statuses.add(str(status))
+            if responsible:
+                responsibles.add(str(responsible))
+        for value in sorted(statuses, key=str.casefold):
+            self.project_status_filter.addItem(value, value)
+        for value in sorted(responsibles, key=str.casefold):
+            self.project_responsible_filter.addItem(value, value)
+        self.project_status_filter.currentIndexChanged.connect(self._filter_project_rows)
+        self.project_responsible_filter.currentIndexChanged.connect(self._filter_project_rows)
+        toolbar.addWidget(self.project_status_filter)
+        toolbar.addWidget(self.project_responsible_filter)
         create = QPushButton("+ Novo projeto")
         create.setObjectName("primaryAction")
         create.clicked.connect(self.create_project)
-        panel.body.addWidget(create, 0, Qt.AlignmentFlag.AlignRight)
-        table = QTableWidget(len(projects), 3)
-        table.setHorizontalHeaderLabels(["Projeto / contrato", "Descrição", "Atualizado em"])
-        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        table.verticalHeader().setVisible(False)
-        table.horizontalHeader().setStretchLastSection(True)
-        for row, project in enumerate(projects):
-            for col, key in enumerate(("name", "description", "updated_at")):
-                table.setItem(row, col, QTableWidgetItem(str(project.get(key) or "—")))
-        panel.body.addWidget(table, 1)
+        toolbar.addWidget(create)
+        panel.body.addLayout(toolbar)
+
+        self.project_table = QTableWidget(len(self.project_rows), 6)
+        self.project_table.setHorizontalHeaderLabels([
+            "Projeto / contrato", "Local", "OAEs", "Etapa", "Responsável", "Status"
+        ])
+        self.project_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.project_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.project_table.verticalHeader().setVisible(False)
+        self.project_table.horizontalHeader().setStretchLastSection(True)
+        for row, project in enumerate(self.project_rows):
+            metadata = project.get("metadata") or {}
+            oae_count = metadata.get("oae_count", metadata.get("oaes"))
+            values = [
+                project.get("name"),
+                metadata.get("location", metadata.get("local")),
+                oae_count,
+                metadata.get("stage", metadata.get("etapa")),
+                metadata.get("responsible", metadata.get("responsavel")),
+                metadata.get("status"),
+            ]
+            for col, value in enumerate(values):
+                self.project_table.setItem(
+                    row, col, QTableWidgetItem("Não informado" if value is None else str(value))
+                )
+        panel.body.addWidget(self.project_table, 1)
         layout.addWidget(panel, 1)
         return page
+
+    def _filter_project_rows(self, *_):
+        if not hasattr(self, "project_table"):
+            return
+        needle = self.project_search.text().strip().casefold()
+        status = self.project_status_filter.currentData()
+        responsible = self.project_responsible_filter.currentData()
+        for row in range(self.project_table.rowCount()):
+            values = [
+                self.project_table.item(row, col).text()
+                for col in range(self.project_table.columnCount())
+                if self.project_table.item(row, col) is not None
+            ]
+            matches_text = not needle or needle in " ".join(values).casefold()
+            matches_status = not status or values[5] == status
+            matches_responsible = not responsible or values[4] == responsible
+            self.project_table.setRowHidden(row, not (
+                matches_text and matches_status and matches_responsible
+            ))
 
     def create_project(self):
         name, accepted = QInputDialog.getText(self, "Novo projeto", "Nome do projeto:")
