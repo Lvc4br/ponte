@@ -1,0 +1,446 @@
+"""PONTE v2 application shell aligned with the approved desktop design system.
+
+The shell provides persistent module navigation and a light operational workspace.
+Only values backed by local stores are shown as metrics; unavailable indicators are
+explicitly marked as not yet calculated.
+"""
+from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QInputDialog,
+    QLabel, QMainWindow, QMessageBox, QPushButton, QStackedWidget,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+)
+
+from app.documents.index import DocumentIndex
+from app.ui.engineering_workspace import EngineeringWorkspaceWindow
+from app.workspace.store import WorkspaceStore
+from app.data.dataset_store import DEFAULT_STORE
+
+
+NAV_ITEMS = [
+    ("Visão geral", "⌂"),
+    ("Projetos e obras", "▦"),
+    ("Pontes e OAEs", "▤"),
+    ("Importar dados", "⇧"),
+    ("Análise de engenharia", "⌕"),
+    ("Documentos", "▧"),
+    ("Relatórios", "▥"),
+]
+
+
+class MetricCard(QFrame):
+    def __init__(self, title: str, value: str, note: str, accent: str = "#2f80b7"):
+        super().__init__()
+        self.setObjectName("metricCard")
+        self.setStyleSheet(
+            f"QFrame#metricCard {{ background:#ffffff; border:1px solid #e1e7ed; "
+            f"border-left:4px solid {accent}; border-radius:8px; }}"
+        )
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 13, 16, 13)
+        label = QLabel(title)
+        label.setObjectName("muted")
+        number = QLabel(value)
+        number.setObjectName("metricValue")
+        foot = QLabel(note)
+        foot.setObjectName("mutedSmall")
+        foot.setWordWrap(True)
+        layout.addWidget(label)
+        layout.addWidget(number)
+        layout.addWidget(foot)
+
+
+class Panel(QFrame):
+    def __init__(self, title: str, subtitle: str = ""):
+        super().__init__()
+        self.setObjectName("panel")
+        self.body = QVBoxLayout(self)
+        self.body.setContentsMargins(18, 15, 18, 17)
+        self.body.setSpacing(10)
+        heading = QLabel(title)
+        heading.setObjectName("panelTitle")
+        self.body.addWidget(heading)
+        if subtitle:
+            detail = QLabel(subtitle)
+            detail.setObjectName("muted")
+            detail.setWordWrap(True)
+            self.body.addWidget(detail)
+
+
+class PonteMainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("PONTE | Engenharia • Inteligência")
+        self.resize(1440, 900)
+        self.setMinimumSize(1120, 720)
+
+        self.store = WorkspaceStore()
+        self.documents = DocumentIndex()
+        self.legacy_window = None
+        self.pages: dict[str, QWidget] = {}
+        self.nav_buttons: dict[str, QPushButton] = {}
+
+        root = QWidget()
+        root.setObjectName("root")
+        root_layout = QHBoxLayout(root)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
+        sidebar = QFrame()
+        sidebar.setObjectName("sidebar")
+        sidebar.setFixedWidth(218)
+        side = QVBoxLayout(sidebar)
+        side.setContentsMargins(13, 22, 13, 16)
+        side.setSpacing(7)
+
+        brand = QLabel("PONTE")
+        brand.setObjectName("brand")
+        side.addWidget(brand)
+        tagline = QLabel("ENGENHARIA • INTELIGÊNCIA")
+        tagline.setObjectName("tagline")
+        side.addWidget(tagline)
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setObjectName("sideLine")
+        side.addWidget(line)
+        side.addSpacing(8)
+
+        self.stack = QStackedWidget()
+        for title, symbol in NAV_ITEMS:
+            button = QPushButton(f"{symbol}   {title}")
+            button.setObjectName("navButton")
+            button.setCheckable(True)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.clicked.connect(lambda checked=False, name=title: self.navigate(name))
+            side.addWidget(button)
+            self.nav_buttons[title] = button
+
+        side.addStretch(1)
+        side_status = QLabel("WORKSPACE LOCAL\nDados armazenados neste dispositivo")
+        side_status.setObjectName("workspaceNote")
+        side_status.setWordWrap(True)
+        side.addWidget(side_status)
+
+        content = QWidget()
+        content.setObjectName("content")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(28, 18, 28, 22)
+        content_layout.setSpacing(18)
+
+        top = QHBoxLayout()
+        self.breadcrumb = QLabel("Ponte  /  Visão geral")
+        self.breadcrumb.setObjectName("breadcrumb")
+        top.addWidget(self.breadcrumb)
+        top.addStretch()
+        org = QLabel("EGT Engenharia   •   Workspace local")
+        org.setObjectName("orgLabel")
+        top.addWidget(org)
+        content_layout.addLayout(top)
+
+        self.page_title = QLabel("Painel operacional")
+        self.page_title.setObjectName("pageTitle")
+        content_layout.addWidget(self.page_title)
+        content_layout.addWidget(self.stack, 1)
+
+        root_layout.addWidget(sidebar)
+        root_layout.addWidget(content, 1)
+        self.setCentralWidget(root)
+        self.setStyleSheet(self._stylesheet())
+
+        self._build_pages()
+        self.navigate("Visão geral")
+
+    def _stylesheet(self) -> str:
+        return """
+        QWidget#root { background:#f3f6f9; color:#243447; font-family:'Segoe UI'; font-size:10pt; }
+        QFrame#sidebar { background:#14283f; }
+        QLabel#brand { color:#ffffff; font-size:25px; font-weight:800; letter-spacing:1px; }
+        QLabel#tagline { color:#9fb1c4; font-size:8pt; }
+        QFrame#sideLine { color:#33485e; background:#33485e; max-height:1px; }
+        QPushButton#navButton { text-align:left; color:#c6d2df; background:transparent;
+            border:0; border-radius:6px; padding:11px 10px; font-size:9pt; }
+        QPushButton#navButton:hover { background:#203a56; color:#ffffff; }
+        QPushButton#navButton:checked { background:#25435f; color:#ffffff; font-weight:700; }
+        QLabel#workspaceNote { color:#91a5ba; font-size:8pt; border-top:1px solid #33485e; padding-top:14px; }
+        QWidget#content { background:#f3f6f9; }
+        QLabel#breadcrumb, QLabel#muted, QLabel#orgLabel { color:#748396; }
+        QLabel#orgLabel { font-size:9pt; }
+        QLabel#pageTitle { color:#1e3044; font-size:17pt; font-weight:700; }
+        QLabel#sectionIntro { color:#66778a; font-size:10pt; }
+        QLabel#metricValue { color:#26384b; font-size:24px; font-weight:750; padding:3px 0; }
+        QLabel#mutedSmall { color:#8492a2; font-size:8pt; }
+        QFrame#panel { background:#ffffff; border:1px solid #e1e7ed; border-radius:8px; }
+        QLabel#panelTitle { color:#26384b; font-size:11pt; font-weight:700; }
+        QPushButton#primaryAction { background:#287db5; color:#ffffff; border:0; border-radius:6px;
+            padding:10px 15px; font-weight:650; }
+        QPushButton#primaryAction:hover { background:#216b9c; }
+        QPushButton#secondaryAction { background:#ffffff; color:#2d6f9f; border:1px solid #d7e0e8;
+            border-radius:6px; padding:9px 13px; }
+        QPushButton#secondaryAction:hover { background:#edf4f9; }
+        QTableWidget { background:#ffffff; alternate-background-color:#f7f9fb; color:#2b3c4e;
+            border:0; gridline-color:#e6ebf0; selection-background-color:#e5f0f8;
+            selection-color:#20364a; }
+        QHeaderView::section { background:#eaf0f5; color:#42566b; border:0;
+            padding:9px 7px; font-weight:700; }
+        """
+
+    def _build_pages(self):
+        self._add_page("Visão geral", self._overview_page())
+        self._add_page("Projetos e obras", self._projects_page())
+        self._add_page("Pontes e OAEs", self._bridges_page())
+        self._add_page("Importar dados", self._module_page(
+            "Entrada e validação de dados",
+            "Importe planilhas com prévia, mapeamento e validação antes de gravar os registros.",
+            "Abrir workspace de planilhas", self.open_spreadsheet_workspace))
+        self._add_page("Análise de engenharia", self._module_page(
+            "Filtros e indicadores de engenharia",
+            "A análise técnica comparável ainda precisa ser conectada ao domínio de pontes e ao catálogo de indicadores. Nenhum resultado demonstrativo será exibido como cálculo validado.",
+            "Abrir workspace de planilhas", self.open_spreadsheet_workspace))
+        self._add_page("Documentos", self._documents_page())
+        self._add_page("Relatórios", self._module_page(
+            "Relatórios e exportações",
+            "Os modelos rastreáveis de resumo executivo, comparativo de OAEs, importação e mapa de quantitativos ainda não estão integrados nesta tela.",
+            "Abrir workspace de planilhas", self.open_spreadsheet_workspace))
+
+    def _add_page(self, name: str, page: QWidget):
+        self.pages[name] = page
+        self.stack.addWidget(page)
+
+    def navigate(self, name: str):
+        page = self.pages.get(name)
+        if page is None:
+            return
+        self.stack.setCurrentWidget(page)
+        self.page_title.setText({
+            "Visão geral": "Painel operacional",
+            "Projetos e obras": "Projetos e obras",
+            "Pontes e OAEs": "Cadastro técnico de pontes e OAEs",
+            "Importar dados": "Importar dados",
+            "Análise de engenharia": "Filtros e indicadores",
+            "Documentos": "Biblioteca documental",
+            "Relatórios": "Relatórios e exportações",
+        }.get(name, name))
+        self.breadcrumb.setText(f"Ponte  /  {name}")
+        for title, button in self.nav_buttons.items():
+            button.setChecked(title == name)
+
+    def _metric_row(self, cards: list[MetricCard]) -> QWidget:
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(14)
+        for card in cards:
+            layout.addWidget(card, 1)
+        return row
+
+    def _overview_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(16)
+
+        intro = QHBoxLayout()
+        text = QVBoxLayout()
+        heading = QLabel("Acompanhe seus dados de engenharia")
+        heading.setStyleSheet("font-size:14pt;font-weight:700;color:#26384b;")
+        sub = QLabel("Resumo atualizado a partir dos registros locais do PONTE.")
+        sub.setObjectName("sectionIntro")
+        text.addWidget(heading)
+        text.addWidget(sub)
+        intro.addLayout(text)
+        intro.addStretch()
+        import_button = QPushButton("+  Importar tabela")
+        import_button.setObjectName("primaryAction")
+        import_button.clicked.connect(lambda: self.navigate("Importar dados"))
+        intro.addWidget(import_button)
+        layout.addLayout(intro)
+
+        projects = self.store.list_projects()
+        try:
+            with sqlite3.connect(DEFAULT_STORE) as db:
+                bridge_count = db.execute("SELECT COUNT(*) FROM records").fetchone()[0]
+        except sqlite3.Error:
+            bridge_count = 0
+        layout.addWidget(self._metric_row([
+            MetricCard("Projetos cadastrados", str(len(projects)), "Projetos registrados no workspace local"),
+            MetricCard("Registros de origem", str(bridge_count), "Registros importados; ainda não equivalem a OAEs validadas", "#4d9b8a"),
+            MetricCard("Dados pendentes", "Não apurado", "A fila de validação ainda não está integrada", "#c58b3e"),
+            MetricCard("Conjuntos analisáveis", "Não apurado", "Compatibilidade técnica ainda não calculada", "#4d9b8a"),
+        ]))
+
+        middle = QHBoxLayout()
+        activity = Panel("Atividade recente", "Movimentações registradas no workspace")
+        empty = QLabel("Nenhuma atividade recente disponível. O histórico de auditoria ainda não está integrado.")
+        empty.setObjectName("muted")
+        empty.setWordWrap(True)
+        activity.body.addWidget(empty)
+        middle.addWidget(activity, 3)
+
+        pending = Panel("Pendências de validação", "Priorize inconsistências antes de comparar")
+        for label, detail in [
+            ("Unidades não identificadas", "Não apurado"),
+            ("Campos geométricos ausentes", "Não apurado"),
+            ("Quantitativos duplicados", "Não apurado"),
+            ("Origem não informada", "Não apurado"),
+        ]:
+            line = QHBoxLayout()
+            item = QLabel("•  " + label)
+            item.setStyleSheet("color:#46586b;")
+            value = QLabel(detail)
+            value.setObjectName("muted")
+            line.addWidget(item)
+            line.addStretch()
+            line.addWidget(value)
+            pending.body.addLayout(line)
+        middle.addWidget(pending, 2)
+        layout.addLayout(middle, 1)
+
+        quick = Panel("Acesso rápido")
+        shortcuts = QHBoxLayout()
+        for title, detail, module in [
+            ("Importar planilha", "XLSX, XLS ou CSV", "Importar dados"),
+            ("Analisar dados", "Filtros e indicadores", "Análise de engenharia"),
+            ("Consultar OAEs", "Cadastro e geometria", "Pontes e OAEs"),
+            ("Gerar relatório", "Resultados e evidências", "Relatórios"),
+        ]:
+            card = QFrame()
+            card.setStyleSheet("QFrame {background:#f7f9fb;border:1px solid #e4eaf0;border-radius:7px;}")
+            box = QVBoxLayout(card)
+            box.setContentsMargins(13, 12, 13, 12)
+            name = QLabel(title)
+            name.setStyleSheet("font-weight:700;color:#34485c;")
+            desc = QLabel(detail)
+            desc.setObjectName("mutedSmall")
+            link = QPushButton("Abrir módulo →")
+            link.setObjectName("secondaryAction")
+            link.clicked.connect(lambda checked=False, target=module: self.navigate(target))
+            box.addWidget(name)
+            box.addWidget(desc)
+            box.addStretch()
+            box.addWidget(link)
+            shortcuts.addWidget(card, 1)
+        quick.body.addLayout(shortcuts)
+        layout.addWidget(quick)
+        return page
+
+    def _projects_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        intro = QLabel("Visão consolidada dos empreendimentos. Cadastre projetos e acompanhe sua estrutura local.")
+        intro.setObjectName("sectionIntro")
+        layout.addWidget(intro)
+        projects = self.store.list_projects()
+        cards = self._metric_row([
+            MetricCard("Projetos cadastrados", str(len(projects)), "Registros no workspace"),
+            MetricCard("OAEs vinculadas", "Não apurado", "Vínculo projeto–OAE ainda não integrado"),
+            MetricCard("Em execução", "Não apurado", "Etapas ainda não estruturadas"),
+            MetricCard("Com pendências", "Não apurado", "Validação ainda não integrada"),
+        ])
+        layout.addWidget(cards)
+        panel = Panel("Empreendimentos cadastrados", "Dados efetivamente gravados no workspace local")
+        create = QPushButton("+ Novo projeto")
+        create.setObjectName("primaryAction")
+        create.clicked.connect(self.create_project)
+        panel.body.addWidget(create, 0, Qt.AlignmentFlag.AlignRight)
+        table = QTableWidget(len(projects), 3)
+        table.setHorizontalHeaderLabels(["Projeto / contrato", "Descrição", "Atualizado em"])
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setStretchLastSection(True)
+        for row, project in enumerate(projects):
+            for col, key in enumerate(("name", "description", "updated_at")):
+                table.setItem(row, col, QTableWidgetItem(str(project.get(key) or "—")))
+        panel.body.addWidget(table, 1)
+        layout.addWidget(panel, 1)
+        return page
+
+    def create_project(self):
+        name, accepted = QInputDialog.getText(self, "Novo projeto", "Nome do projeto:")
+        if not accepted:
+            return
+        try:
+            self.store.create_project(name)
+            self.refresh_pages()
+            self.navigate("Projetos e obras")
+        except Exception as exc:
+            QMessageBox.warning(self, "Não foi possível criar o projeto", str(exc))
+
+    def _bridges_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        panel = Panel("Cadastro técnico de pontes e OAEs",
+                      "O cadastro deverá reunir identificação, geometria, materiais, quantitativos, inspeções, documentos e histórico.")
+        panel.body.addWidget(QLabel(
+            "A base atual contém registros de origem, mas ainda não há uma ficha OAE integrada a este workspace. "
+            "Por isso, os registros não são apresentados como pontes cadastradas ou validadas."
+        ))
+        panel.body.addWidget(QLabel("A próxima integração necessária é o domínio de pontes/OAEs e seus repositórios persistentes."))
+        layout.addWidget(panel)
+        layout.addStretch(1)
+        return page
+
+    def _documents_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        panel = Panel("Documentos indexados", "Arquivos analisados e catalogados neste dispositivo")
+        docs = self.documents.list_documents()
+        panel.body.addWidget(self._metric_row([
+            MetricCard("Documentos indexados", str(len(docs)), "Catálogo local"),
+            MetricCard("Aguardando revisão", str(sum(1 for d in docs if d.get("status") not in ("ok", "completed", "success"))), "Conforme status registrado"),
+            MetricCard("Versões recentes", "Não apurado", "Versionamento documental ainda não integrado"),
+        ]))
+        table = QTableWidget(len(docs), 5)
+        table.setHorizontalHeaderLabels(["Documento", "Formato", "Situação", "Seções", "Digitalizado em"])
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setStretchLastSection(True)
+        for row, doc in enumerate(docs):
+            values = [doc.get("file_name"), doc.get("extension"), doc.get("status"),
+                      doc.get("section_count"), doc.get("scanned_at")]
+            for col, value in enumerate(values):
+                table.setItem(row, col, QTableWidgetItem(str(value if value is not None else "—")))
+        panel.body.addWidget(table, 1)
+        layout.addWidget(panel, 1)
+        return page
+
+    def _module_page(self, title: str, description: str, action: str, callback) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        panel = Panel(title, description)
+        note = QLabel("Estado da integração: módulo em construção. Esta tela não usa números fictícios nem declara cálculos como validados.")
+        note.setWordWrap(True)
+        note.setStyleSheet("background:#f4f7fa;color:#607286;padding:14px;border-radius:6px;")
+        panel.body.addWidget(note)
+        button = QPushButton(action)
+        button.setObjectName("primaryAction")
+        button.clicked.connect(callback)
+        panel.body.addWidget(button, 0, Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(panel)
+        layout.addStretch(1)
+        return page
+
+    def open_spreadsheet_workspace(self):
+        if self.legacy_window is None:
+            self.legacy_window = EngineeringWorkspaceWindow()
+        self.legacy_window.show()
+        self.legacy_window.raise_()
+        self.legacy_window.activateWindow()
+
+    def refresh_pages(self):
+        current = self.stack.currentIndex()
+        self.stack.removeWidget(self.pages["Projetos e obras"])
+        self.pages["Projetos e obras"].deleteLater()
+        new_page = self._projects_page()
+        self.pages["Projetos e obras"] = new_page
+        self.stack.insertWidget(1, new_page)
+        self.stack.setCurrentIndex(current)
