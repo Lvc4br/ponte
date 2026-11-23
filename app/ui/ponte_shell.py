@@ -18,11 +18,10 @@ from PySide6.QtWidgets import (
 )
 
 from app.documents.index import DocumentIndex
-from app.data.dataset_store import DatasetStore
 from app.ui.engineering_workspace import EngineeringWorkspaceWindow
 from app.workspace.store import WorkspaceStore
 from app.workspace.exchange import SpreadsheetExchange
-from app.data.dataset_store import DEFAULT_STORE
+from app.data.dataset_store import DEFAULT_STORE, DatasetStore
 
 
 NAV_ITEMS = [
