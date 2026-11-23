@@ -170,7 +170,7 @@ class PonteMainWindow(QMainWindow):
         self.breadcrumb.setObjectName("breadcrumb")
         top.addWidget(self.breadcrumb)
         top.addStretch()
-        org = QLabel("EGT Engenharia   •   Workspace local")
+        org = QLabel("EGT Engenharia   •   ▾")
         org.setObjectName("orgLabel")
         top.addWidget(org)
         content_layout.addLayout(top)
@@ -244,7 +244,7 @@ class PonteMainWindow(QMainWindow):
             "Visão geral": "Painel operacional",
             "Projetos e obras": "Projetos e obras",
             "Pontes e OAEs": "Cadastro técnico de pontes e OAEs",
-            "Importar dados": "Importar dados",
+            "Importar dados": "Entrada e validação de planilhas",
             "Análise de engenharia": "Filtros e indicadores",
             "Documentos": "Biblioteca documental",
             "Relatórios": "Relatórios e exportações",
@@ -653,184 +653,152 @@ class PonteMainWindow(QMainWindow):
         )
 
     def _import_page(self) -> QWidget:
-        """Import workflow with scroll-safe controls and a usable records grid."""
+        """Import page matching the approved PDF: upload area, five vertical steps and integrity note."""
         page = QWidget()
         page_layout = QVBoxLayout(page)
         page_layout.setContentsMargins(0, 0, 0, 0)
         page_layout.setSpacing(0)
 
-        # Keep the entire workflow reachable at different resolutions and DPI scales.
         scroll = QScrollArea()
         scroll.setObjectName("importPageScroll")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
         content = QWidget()
         layout = QVBoxLayout(content)
         layout.setContentsMargins(0, 0, 8, 0)
-        layout.setSpacing(12)
+        layout.setSpacing(14)
 
-        intro = QVBoxLayout()
-        intro.setSpacing(5)
         heading = QLabel("Importar tabela de engenharia")
-        heading.setMinimumHeight(30)
-        heading.setStyleSheet("font-size:14pt;font-weight:700;color:#26384b;")
+        heading.setMinimumHeight(32)
+        heading.setStyleSheet("font-size:16pt;font-weight:700;color:#26384b;")
         subtitle = QLabel(
-            "Traga planilhas existentes para o PONTE mantendo o arquivo original, "
-            "a origem dos dados e a rastreabilidade."
+            "Traga planilhas existentes para o PONTE mantendo a origem e a rastreabilidade."
         )
         subtitle.setObjectName("sectionIntro")
-        subtitle.setMinimumHeight(24)
+        subtitle.setMinimumHeight(25)
         subtitle.setWordWrap(True)
-        intro.addWidget(heading)
-        intro.addWidget(subtitle)
-        layout.addLayout(intro)
+        layout.addWidget(heading)
+        layout.addWidget(subtitle)
 
-        upload = Panel("Selecionar arquivo", "Entrada de planilhas para validação")
+        # Large, uncluttered drop zone as shown in the approved import screen.
         drop_area = FileDropFrame(self.select_import_file)
-        drop_area.setMinimumHeight(116)
+        drop_area.setObjectName("importDropArea")
+        drop_area.setMinimumHeight(154)
         drop_area.setStyleSheet(
-            "QFrame {background:#eaf3fa;border:1px dashed #8fb4d0;border-radius:8px;}"
+            "QFrame#importDropArea {background:#ffffff;border:1px dashed #8fb4d0;"
+            "border-radius:8px;}"
         )
         drop_layout = QVBoxLayout(drop_area)
-        drop_layout.setContentsMargins(20, 12, 20, 12)
-        drop_layout.setSpacing(6)
-        drop_title = QLabel("Selecione uma planilha Excel ou CSV para pré-visualizar")
+        drop_layout.setContentsMargins(22, 17, 22, 17)
+        drop_layout.setSpacing(8)
+
+        drop_title = QLabel("Arraste um arquivo Excel ou CSV para esta área")
         drop_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        drop_title.setMinimumHeight(28)
+        drop_title.setMinimumHeight(30)
         drop_title.setWordWrap(True)
-        drop_title.setStyleSheet("font-size:12pt;font-weight:700;color:#294b67;")
+        drop_title.setStyleSheet("font-size:12pt;font-weight:700;color:#294b67;border:0;")
         drop_detail = QLabel(
-            ".xlsx  •  .xls  •  .csv     |     O arquivo original será preservado"
+            ".xlsx  •  .xls  •  .csv  |  O arquivo original será preservado"
         )
         drop_detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_detail.setMinimumHeight(24)
         drop_detail.setWordWrap(True)
         drop_detail.setObjectName("muted")
+        drop_detail.setStyleSheet("border:0;")
         choose = QPushButton("Selecionar arquivo")
         choose.setObjectName("primaryAction")
-        choose.setMinimumHeight(40)
+        choose.setMinimumHeight(42)
+        choose.setMinimumWidth(168)
         choose.clicked.connect(self.select_import_file)
+
         drop_layout.addWidget(drop_title)
         drop_layout.addWidget(drop_detail)
         drop_layout.addWidget(choose, 0, Qt.AlignmentFlag.AlignHCenter)
-        upload.body.addWidget(drop_area)
-        layout.addWidget(upload)
+        layout.addWidget(drop_area)
 
         steps = Panel("Etapas de importação")
+        steps.body.setSpacing(2)
         step_data = [
-            ("01", "Selecionar arquivo", "Escolha o arquivo e as abas que deseja importar."),
-            ("02", "Conferir prévia", "Revise as primeiras linhas, cabeçalhos e valores originais."),
-            ("03", "Mapear colunas e unidades", "Etapa de mapeamento técnico ainda em preparação; os cabeçalhos originais são preservados."),
-            ("04", "Validar dados", "A validação de unidades, duplicidades e comparabilidade de engenharia ainda não está integrada."),
-            ("05", "Importar e analisar", "A importação genérica está disponível; a análise técnica depende das etapas anteriores."),
+            ("01", "Selecionar arquivo",
+             "Escolha o arquivo e as abas que deseja importar.", "Disponível"),
+            ("02", "Conferir prévia",
+             "Revise cabeçalhos, linhas, tipos e valores originais.", "Disponível"),
+            ("03", "Mapear colunas",
+             "Associe campos, unidades e escopo com confirmação.", "Em preparação"),
+            ("04", "Validar dados",
+             "Identifique ausências, duplicidades e inconsistências.", "Em preparação"),
+            ("05", "Importar e analisar",
+             "Grave os dados e abra a análise do conjunto importado.", "Importação disponível"),
         ]
-        step_grid = QGridLayout()
-        step_grid.setContentsMargins(0, 2, 0, 2)
-        step_grid.setHorizontalSpacing(9)
-        step_grid.setVerticalSpacing(8)
-        for column, (number, title, detail) in enumerate(step_data):
-            card = QFrame()
-            card.setObjectName("importStepCard")
-            card.setStyleSheet(
-                "QFrame#importStepCard {background:#f7f9fb;border:1px solid #e4eaf0;border-radius:7px;}"
+
+        for index, (number, title, detail, status) in enumerate(step_data):
+            row = QFrame()
+            row.setObjectName("importStepRow")
+            row.setStyleSheet(
+                "QFrame#importStepRow {background:transparent;border:0;}"
             )
-            card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(9, 8, 9, 8)
-            card_layout.setSpacing(6)
-            step_heading = QHBoxLayout()
-            step_heading.setSpacing(7)
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(2, 7, 2, 7)
+            row_layout.setSpacing(14)
+
             number_label = QLabel(number)
             number_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            number_label.setFixedSize(30, 30)
+            number_label.setFixedSize(34, 34)
             number_label.setStyleSheet(
-                "background:#eaf3fa;color:#287db5;border-radius:15px;font-weight:700;"
+                "background:#eaf3fa;color:#287db5;border-radius:17px;"
+                "font-size:9pt;font-weight:700;border:0;"
             )
+
+            text_column = QVBoxLayout()
+            text_column.setContentsMargins(0, 0, 0, 0)
+            text_column.setSpacing(3)
             title_label = QLabel(title)
-            title_label.setMinimumHeight(26)
-            title_label.setWordWrap(True)
-            title_label.setStyleSheet("font-weight:700;color:#34485c;")
-            step_heading.addWidget(number_label, 0, Qt.AlignmentFlag.AlignTop)
-            step_heading.addWidget(title_label, 1)
+            title_label.setMinimumHeight(23)
+            title_label.setStyleSheet(
+                "font-size:10pt;font-weight:700;color:#34485c;border:0;"
+            )
             detail_label = QLabel(detail)
-            detail_label.setMinimumHeight(36)
+            detail_label.setMinimumHeight(21)
             detail_label.setWordWrap(True)
-            detail_label.setAlignment(Qt.AlignmentFlag.AlignTop)
             detail_label.setObjectName("mutedSmall")
-            card_layout.addLayout(step_heading)
-            card_layout.addWidget(detail_label, 1)
-            step_grid.addWidget(card, 0, column)
-        steps.body.addLayout(step_grid)
+            detail_label.setStyleSheet("border:0;")
+            text_column.addWidget(title_label)
+            text_column.addWidget(detail_label)
+
+            status_label = QLabel(status)
+            status_label.setMinimumHeight(22)
+            status_label.setAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
+            status_label.setObjectName("mutedSmall")
+            status_label.setStyleSheet("border:0;")
+
+            row_layout.addWidget(number_label, 0, Qt.AlignmentFlag.AlignVCenter)
+            row_layout.addLayout(text_column, 1)
+            row_layout.addWidget(status_label, 0, Qt.AlignmentFlag.AlignVCenter)
+            steps.body.addWidget(row)
+
+            if index < len(step_data) - 1:
+                separator = QFrame()
+                separator.setFrameShape(QFrame.Shape.HLine)
+                separator.setFixedHeight(1)
+                separator.setStyleSheet("background:#edf1f5;border:0;")
+                steps.body.addWidget(separator)
+
         layout.addWidget(steps)
-
-        # Browser for generic imported workspace tables.
-        data_panel = Panel(
-            "Tabelas importadas",
-            "Consulte os registros gravados no workspace sem alterar os valores originais."
-        )
-        selectors = QHBoxLayout()
-        selectors.setSpacing(8)
-        self.workspace_project_combo = QComboBox()
-        self.workspace_project_combo.setMinimumHeight(38)
-        self.workspace_project_combo.currentIndexChanged.connect(self._refresh_workspace_table_choices)
-        self.workspace_table_combo = QComboBox()
-        self.workspace_table_combo.setMinimumHeight(38)
-        self.workspace_table_combo.currentIndexChanged.connect(self._load_workspace_table)
-        self.workspace_column_filter = QComboBox()
-        self.workspace_column_filter.setMinimumHeight(40)
-        self.workspace_column_filter.addItem("Todas as colunas", "")
-        self.workspace_search = QLineEdit()
-        self.workspace_search.setMinimumHeight(40)
-        self.workspace_search.setPlaceholderText("Pesquisar em todos os campos…")
-        self.workspace_search.textChanged.connect(self._filter_workspace_table)
-        selectors.addWidget(QLabel("Projeto"))
-        selectors.addWidget(self.workspace_project_combo, 1)
-        selectors.addWidget(QLabel("Tabela"))
-        selectors.addWidget(self.workspace_table_combo, 1)
-        data_panel.body.addLayout(selectors)
-
-        filter_row = QHBoxLayout()
-        filter_row.setSpacing(8)
-        filter_row.addWidget(QLabel("Filtrar coluna"))
-        filter_row.addWidget(self.workspace_column_filter)
-        filter_row.addWidget(self.workspace_search, 2)
-        clear_filter = QPushButton("Limpar filtros")
-        clear_filter.setObjectName("secondaryAction")
-        clear_filter.setMinimumHeight(42)
-        clear_filter.clicked.connect(self._clear_workspace_filters)
-        filter_row.addWidget(clear_filter)
-        data_panel.body.addLayout(filter_row)
-
-        self.workspace_table_status = QLabel(
-            "Selecione um projeto e uma tabela para visualizar os registros."
-        )
-        self.workspace_table_status.setMinimumHeight(24)
-        self.workspace_table_status.setObjectName("muted")
-        data_panel.body.addWidget(self.workspace_table_status)
-
-        self.workspace_data_table = QTableWidget(0, 0)
-        self.workspace_data_table.setMinimumHeight(280)
-        self.workspace_data_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.workspace_data_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.workspace_data_table.setAlternatingRowColors(True)
-        self.workspace_data_table.setSortingEnabled(False)
-        self.workspace_data_table.setWordWrap(False)
-        self.workspace_data_table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-        self.workspace_data_table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-        self.workspace_data_table.verticalHeader().setDefaultSectionSize(28)
-        data_panel.body.addWidget(self.workspace_data_table, 1)
-        layout.addWidget(data_panel, 1)
-        self._refresh_workspace_project_choices()
 
         integrity = QLabel(
             "Princípio de integridade: nenhuma unidade, fórmula ou valor será corrigido silenciosamente."
         )
-        integrity.setMinimumHeight(38)
+        integrity.setMinimumHeight(42)
         integrity.setWordWrap(True)
         integrity.setStyleSheet(
-            "background:#fff5e5;color:#93621f;padding:10px;border-radius:6px;"
+            "background:#fff5e5;color:#93621f;padding:11px 14px;border-radius:6px;"
         )
         layout.addWidget(integrity)
+        layout.addStretch(1)
 
         scroll.setWidget(content)
         page_layout.addWidget(scroll)
@@ -919,117 +887,25 @@ class PonteMainWindow(QMainWindow):
             else:
                 created = exchange.import_xlsx(project_id, path)
             self.refresh_pages()
-            self._refresh_workspace_project_choices()
-            project_index = self.workspace_project_combo.findData(project_id)
-            if project_index >= 0:
-                self.workspace_project_combo.setCurrentIndex(project_index)
-            if created:
-                first_table_index = self.workspace_table_combo.findData(created[0])
-                if first_table_index >= 0:
-                    self.workspace_table_combo.setCurrentIndex(first_table_index)
             self.navigate("Importar dados")
             QMessageBox.information(
                 self,
                 "Importação concluída",
                 f"{len(created)} tabela(s) criada(s) no projeto selecionado.\n"
-                "A primeira tabela importada foi carregada na área de consulta abaixo.\n"
+                "Os dados foram gravados no workspace local.\n"
                 "O arquivo de origem permaneceu no local original.",
             )
+            open_workspace = QMessageBox.question(
+                self,
+                "Consultar dados importados",
+                "Deseja abrir a ferramenta auxiliar de planilhas para consultar os registros?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if open_workspace == QMessageBox.StandardButton.Yes:
+                self.open_spreadsheet_workspace()
         except Exception as exc:
             QMessageBox.critical(self, "Falha na importação", str(exc))
-
-    def _refresh_workspace_project_choices(self):
-        if not hasattr(self, "workspace_project_combo"):
-            return
-        previous = self.workspace_project_combo.currentData()
-        self.workspace_project_combo.blockSignals(True)
-        self.workspace_project_combo.clear()
-        for project in self.store.list_projects():
-            self.workspace_project_combo.addItem(project["name"], project["id"])
-        index = self.workspace_project_combo.findData(previous)
-        self.workspace_project_combo.setCurrentIndex(index if index >= 0 else (0 if self.workspace_project_combo.count() else -1))
-        self.workspace_project_combo.blockSignals(False)
-        self._refresh_workspace_table_choices()
-
-    def _refresh_workspace_table_choices(self, *_):
-        if not hasattr(self, "workspace_table_combo"):
-            return
-        project_id = self.workspace_project_combo.currentData()
-        self.workspace_table_combo.blockSignals(True)
-        self.workspace_table_combo.clear()
-        if project_id is not None:
-            for table in self.store.list_tables(int(project_id)):
-                self.workspace_table_combo.addItem(table["name"], table["id"])
-        self.workspace_table_combo.blockSignals(False)
-        self._load_workspace_table()
-
-    def _load_workspace_table(self, *_):
-        if not hasattr(self, "workspace_data_table"):
-            return
-        table_id = self.workspace_table_combo.currentData()
-        self.workspace_data_table.clear()
-        self.workspace_data_table.setRowCount(0)
-        self.workspace_data_table.setColumnCount(0)
-        self.workspace_column_filter.blockSignals(True)
-        self.workspace_column_filter.clear()
-        self.workspace_column_filter.addItem("Todas as colunas", "")
-        self.workspace_column_filter.blockSignals(False)
-        if table_id is None:
-            self.workspace_table_status.setText("Nenhuma tabela encontrada neste projeto.")
-            return
-        columns = self.store.list_columns(int(table_id))
-        records = self.store.list_records(int(table_id))
-        names = [column["name"] for column in columns]
-        self.workspace_data_table.setColumnCount(len(names))
-        self.workspace_data_table.setHorizontalHeaderLabels(names)
-        self.workspace_data_table.setRowCount(len(records))
-        for column in columns:
-            self.workspace_column_filter.addItem(column["name"], column["name"])
-        for row_index, record in enumerate(records):
-            values = record.get("values", {})
-            for column_index, name in enumerate(names):
-                value = values.get(name)
-                item = QTableWidgetItem("" if value is None else str(value))
-                item.setData(Qt.ItemDataRole.UserRole, value)
-                self.workspace_data_table.setItem(row_index, column_index, item)
-        self.workspace_data_table.resizeColumnsToContents()
-        self.workspace_table_status.setText(
-            f"{len(records)} registro(s) • {len(names)} coluna(s) • valores de origem preservados."
-        )
-        self._filter_workspace_table()
-
-    def _filter_workspace_table(self, *_):
-        if not hasattr(self, "workspace_data_table"):
-            return
-        needle = self.workspace_search.text().strip().casefold()
-        selected_column = self.workspace_column_filter.currentData()
-        headers = [
-            self.workspace_data_table.horizontalHeaderItem(i).text()
-            for i in range(self.workspace_data_table.columnCount())
-            if self.workspace_data_table.horizontalHeaderItem(i) is not None
-        ]
-        target_index = headers.index(selected_column) if selected_column in headers else None
-        visible = 0
-        for row in range(self.workspace_data_table.rowCount()):
-            indexes = [target_index] if target_index is not None else range(self.workspace_data_table.columnCount())
-            values = [
-                self.workspace_data_table.item(row, col).text()
-                for col in indexes
-                if self.workspace_data_table.item(row, col) is not None
-            ]
-            matches = not needle or any(needle in value.casefold() for value in values)
-            self.workspace_data_table.setRowHidden(row, not matches)
-            visible += int(matches)
-        if self.workspace_table_combo.currentData() is not None:
-            self.workspace_table_status.setText(
-                f"{visible} de {self.workspace_data_table.rowCount()} registro(s) visíveis • "
-                f"{self.workspace_data_table.columnCount()} coluna(s)."
-            )
-
-    def _clear_workspace_filters(self):
-        self.workspace_search.clear()
-        self.workspace_column_filter.setCurrentIndex(0)
-        self._filter_workspace_table()
 
     @staticmethod
     def _format_sheet_preview(sheets):
