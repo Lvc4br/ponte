@@ -2,9 +2,14 @@ name: Testes automatizados
 
 on:
   push:
-    branches: [main, "feature/document-control-spreadsheet-review", "feature/three-column-engineering-dashboard"]
+    branches:
+      - main
+      - "feature/**"
+      - "rebuild/**"
   pull_request:
-    branches: [main, "feature/document-control-spreadsheet-review", "feature/three-column-engineering-dashboard"]
+    branches:
+      - main
+      - "rebuild/**"
   workflow_dispatch:
 
 concurrency:
