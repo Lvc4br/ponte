@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QInputDialog,
     QLabel, QMainWindow, QMessageBox, QPushButton, QStackedWidget,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
-    QComboBox, QLineEdit, QFileDialog,
+    QComboBox, QLineEdit, QFileDialog, QTabWidget,
 )
 
 from app.documents.index import DocumentIndex
@@ -460,17 +460,29 @@ class PonteMainWindow(QMainWindow):
         layout.addWidget(listing, 2)
 
         detail = Panel("Ficha técnica da OAE", "Consulta dos campos disponíveis no registro de origem • somente leitura")
-        self.bridge_detail = QLabel(
-            load_error or (
-                "Nenhum registro legado de ponte/OAE foi encontrado nesta base. A importação genérica atual "
-                "ainda não mapeia planilhas para o cadastro técnico de OAE."
-                if not self.bridge_records else
-                "Selecione uma linha acima. Campos ausentes serão exibidos como “Não informado”."
-            )
+        self.bridge_tabs = QTabWidget()
+        self.bridge_tab_labels = {}
+        empty_message = load_error or (
+            "Nenhum registro legado de ponte/OAE foi encontrado nesta base. "
+            "A importação genérica atual ainda não mapeia planilhas para o cadastro técnico de OAE."
+            if not self.bridge_records else
+            "Selecione uma linha acima. Campos ausentes serão exibidos como “Não informado”."
         )
-        self.bridge_detail.setWordWrap(True)
-        self.bridge_detail.setObjectName("sectionIntro")
-        detail.body.addWidget(self.bridge_detail)
+        for key, title in [
+            ("identification", "Identificação"),
+            ("geometry", "Geometria"),
+            ("quantities", "Materiais e quantitativos"),
+            ("inspections", "Inspeções"),
+            ("documents", "Documentos"),
+            ("history", "Histórico"),
+        ]:
+            tab_label = QLabel(empty_message)
+            tab_label.setWordWrap(True)
+            tab_label.setObjectName("sectionIntro")
+            tab_label.setContentsMargins(12, 12, 12, 12)
+            self.bridge_tab_labels[key] = tab_label
+            self.bridge_tabs.addTab(tab_label, title)
+        detail.body.addWidget(self.bridge_tabs)
         layout.addWidget(detail, 1)
 
         if load_error:
@@ -532,8 +544,53 @@ class PonteMainWindow(QMainWindow):
         if record.source_sheet:
             source += f" • Aba: {record.source_sheet}"
         source += f" • Linha de origem: {record.source_row}"
-        self.bridge_detail.setText("\n".join(parts) + "\n\n" + source
-                                    + "\n\nEstado: não validado nesta ficha.")
+        identity_fields = [
+            ("Identificador", record.get("obra", record.source_row)),
+            ("Nome da estrutura", record.get("nome", record.get("obra_nome"))),
+            ("Projeto", record.get("projeto")),
+            ("Tipologia", record.get("tipo_obra")),
+            ("Município / UF", record.get("municipio")),
+            ("Rodovia / km", record.get("rodovia")),
+            ("Latitude", record.get("latitude")),
+            ("Longitude", record.get("longitude")),
+        ]
+        geometry_fields = [
+            ("Comprimento total", record.get("compr_obra_m"), "m"),
+            ("Largura do tabuleiro", record.get("largura_m"), "m"),
+            ("Vão mínimo", record.get("vao_min_m", record.get("vão_min_m")), "m"),
+            ("Vão máximo", record.get("vao_max_m", record.get("vão_max_m")), "m"),
+            ("Seção", record.get("secao")),
+            ("Altura de viga/laje", record.get("hviga_laje_m")),
+        ]
+
+        def render(items):
+            lines = []
+            for item in items:
+                label, value, *unit = item
+                rendered = "Não informado" if value is None else str(value)
+                if unit and value is not None:
+                    rendered = f"{rendered} {unit[0]}"
+                lines.append(f"{label}: {rendered}")
+            return "\n".join(lines)
+
+        self.bridge_tab_labels["identification"].setText(
+            render(identity_fields) + "\n\nEstado cadastral: não validado."
+        )
+        self.bridge_tab_labels["geometry"].setText(
+            render(geometry_fields) + "\n\nMedidas exibidas conforme os campos de origem."
+        )
+        self.bridge_tab_labels["quantities"].setText(
+            render(fields[7:]) + "\n\nDefinições e fórmulas dos indicadores ainda dependem de aprovação da engenharia."
+        )
+        pending = "Módulo ainda não integrado ao cadastro OAE."
+        self.bridge_tab_labels["inspections"].setText(pending)
+        self.bridge_tab_labels["documents"].setText(
+            "Vínculo documental específico da OAE ainda não integrado.\n" + pending
+        )
+        self.bridge_tab_labels["history"].setText(
+            source + f"\n\nID interno do registro: {record.source_row}\n"
+            "Histórico de alterações e trilha de auditoria ainda não integrados."
+        )
 
     def _import_page(self) -> QWidget:
         """Import workflow screen from the approved PONTE design, not the spreadsheet grid."""
