@@ -459,11 +459,11 @@ class PonteMainWindow(QMainWindow):
         listing.body.addWidget(self.bridge_table, 1)
         layout.addWidget(listing, 2)
 
-        detail = Panel("Ficha técnica da OAE", "Selecione um registro para consultar os campos disponíveis")
+        detail = Panel("Ficha técnica da OAE", "Consulta dos campos disponíveis no registro de origem • somente leitura")
         self.bridge_detail = QLabel(
             load_error or (
-                "Nenhum registro de ponte/OAE foi importado. Use Importar dados para adicionar "
-                "uma planilha; o arquivo original será preservado."
+                "Nenhum registro legado de ponte/OAE foi encontrado nesta base. A importação genérica atual "
+                "ainda não mapeia planilhas para o cadastro técnico de OAE."
                 if not self.bridge_records else
                 "Selecione uma linha acima. Campos ausentes serão exibidos como “Não informado”."
             )
