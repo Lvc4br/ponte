@@ -725,6 +725,47 @@ class PonteMainWindow(QMainWindow):
             steps.body.addLayout(line)
         layout.addWidget(steps, 1)
 
+        # Browser for generic imported workspace tables.
+        data_panel = Panel("Tabelas importadas", "Consulte os registros gravados no workspace sem alterar os valores originais.")
+        selectors = QHBoxLayout()
+        self.workspace_project_combo = QComboBox()
+        self.workspace_project_combo.currentIndexChanged.connect(self._refresh_workspace_table_choices)
+        self.workspace_table_combo = QComboBox()
+        self.workspace_table_combo.currentIndexChanged.connect(self._load_workspace_table)
+        self.workspace_column_filter = QComboBox()
+        self.workspace_column_filter.addItem("Todas as colunas", "")
+        self.workspace_search = QLineEdit()
+        self.workspace_search.setPlaceholderText("Pesquisar em todos os campos…")
+        self.workspace_search.textChanged.connect(self._filter_workspace_table)
+        selectors.addWidget(QLabel("Projeto"))
+        selectors.addWidget(self.workspace_project_combo, 1)
+        selectors.addWidget(QLabel("Tabela"))
+        selectors.addWidget(self.workspace_table_combo, 1)
+        data_panel.body.addLayout(selectors)
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(QLabel("Filtrar coluna"))
+        filter_row.addWidget(self.workspace_column_filter)
+        filter_row.addWidget(self.workspace_search, 2)
+        clear_filter = QPushButton("Limpar filtros")
+        clear_filter.setObjectName("secondaryAction")
+        clear_filter.clicked.connect(self._clear_workspace_filters)
+        filter_row.addWidget(clear_filter)
+        data_panel.body.addLayout(filter_row)
+        self.workspace_table_status = QLabel("Selecione um projeto e uma tabela para visualizar os registros.")
+        self.workspace_table_status.setObjectName("muted")
+        data_panel.body.addWidget(self.workspace_table_status)
+        self.workspace_data_table = QTableWidget(0, 0)
+        self.workspace_data_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.workspace_data_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.workspace_data_table.setAlternatingRowColors(True)
+        self.workspace_data_table.setSortingEnabled(False)
+        self.workspace_data_table.setWordWrap(False)
+        self.workspace_data_table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.workspace_data_table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        data_panel.body.addWidget(self.workspace_data_table, 1)
+        layout.addWidget(data_panel, 2)
+        self._refresh_workspace_project_choices()
+
         integrity = QLabel(
             "Princípio de integridade: nenhuma unidade, fórmula ou valor será corrigido silenciosamente."
         )
@@ -818,14 +859,117 @@ class PonteMainWindow(QMainWindow):
             else:
                 created = exchange.import_xlsx(project_id, path)
             self.refresh_pages()
+            self._refresh_workspace_project_choices()
+            project_index = self.workspace_project_combo.findData(project_id)
+            if project_index >= 0:
+                self.workspace_project_combo.setCurrentIndex(project_index)
+            if created:
+                first_table_index = self.workspace_table_combo.findData(created[0])
+                if first_table_index >= 0:
+                    self.workspace_table_combo.setCurrentIndex(first_table_index)
+            self.navigate("Importar dados")
             QMessageBox.information(
                 self,
                 "Importação concluída",
                 f"{len(created)} tabela(s) criada(s) no projeto selecionado.\n"
+                "A primeira tabela importada foi carregada na área de consulta abaixo.\n"
                 "O arquivo de origem permaneceu no local original.",
             )
         except Exception as exc:
             QMessageBox.critical(self, "Falha na importação", str(exc))
+
+    def _refresh_workspace_project_choices(self):
+        if not hasattr(self, "workspace_project_combo"):
+            return
+        previous = self.workspace_project_combo.currentData()
+        self.workspace_project_combo.blockSignals(True)
+        self.workspace_project_combo.clear()
+        for project in self.store.list_projects():
+            self.workspace_project_combo.addItem(project["name"], project["id"])
+        index = self.workspace_project_combo.findData(previous)
+        self.workspace_project_combo.setCurrentIndex(index if index >= 0 else (0 if self.workspace_project_combo.count() else -1))
+        self.workspace_project_combo.blockSignals(False)
+        self._refresh_workspace_table_choices()
+
+    def _refresh_workspace_table_choices(self, *_):
+        if not hasattr(self, "workspace_table_combo"):
+            return
+        project_id = self.workspace_project_combo.currentData()
+        self.workspace_table_combo.blockSignals(True)
+        self.workspace_table_combo.clear()
+        if project_id is not None:
+            for table in self.store.list_tables(int(project_id)):
+                self.workspace_table_combo.addItem(table["name"], table["id"])
+        self.workspace_table_combo.blockSignals(False)
+        self._load_workspace_table()
+
+    def _load_workspace_table(self, *_):
+        if not hasattr(self, "workspace_data_table"):
+            return
+        table_id = self.workspace_table_combo.currentData()
+        self.workspace_data_table.clear()
+        self.workspace_data_table.setRowCount(0)
+        self.workspace_data_table.setColumnCount(0)
+        self.workspace_column_filter.blockSignals(True)
+        self.workspace_column_filter.clear()
+        self.workspace_column_filter.addItem("Todas as colunas", "")
+        self.workspace_column_filter.blockSignals(False)
+        if table_id is None:
+            self.workspace_table_status.setText("Nenhuma tabela encontrada neste projeto.")
+            return
+        columns = self.store.list_columns(int(table_id))
+        records = self.store.list_records(int(table_id))
+        names = [column["name"] for column in columns]
+        self.workspace_data_table.setColumnCount(len(names))
+        self.workspace_data_table.setHorizontalHeaderLabels(names)
+        self.workspace_data_table.setRowCount(len(records))
+        for column in columns:
+            self.workspace_column_filter.addItem(column["name"], column["name"])
+        for row_index, record in enumerate(records):
+            values = record.get("values", {})
+            for column_index, name in enumerate(names):
+                value = values.get(name)
+                item = QTableWidgetItem("" if value is None else str(value))
+                item.setData(Qt.ItemDataRole.UserRole, value)
+                self.workspace_data_table.setItem(row_index, column_index, item)
+        self.workspace_data_table.resizeColumnsToContents()
+        self.workspace_table_status.setText(
+            f"{len(records)} registro(s) • {len(names)} coluna(s) • valores de origem preservados."
+        )
+        self._filter_workspace_table()
+
+    def _filter_workspace_table(self, *_):
+        if not hasattr(self, "workspace_data_table"):
+            return
+        needle = self.workspace_search.text().strip().casefold()
+        selected_column = self.workspace_column_filter.currentData()
+        headers = [
+            self.workspace_data_table.horizontalHeaderItem(i).text()
+            for i in range(self.workspace_data_table.columnCount())
+            if self.workspace_data_table.horizontalHeaderItem(i) is not None
+        ]
+        target_index = headers.index(selected_column) if selected_column in headers else None
+        visible = 0
+        for row in range(self.workspace_data_table.rowCount()):
+            indexes = [target_index] if target_index is not None else range(self.workspace_data_table.columnCount())
+            values = [
+                self.workspace_data_table.item(row, col).text()
+                for col in indexes
+                if self.workspace_data_table.item(row, col) is not None
+            ]
+            matches = not needle or any(needle in value.casefold() for value in values)
+            self.workspace_data_table.setRowHidden(row, not matches)
+            visible += int(matches)
+        if self.workspace_table_combo.currentData() is not None:
+            self.workspace_table_status.setText(
+                f"{visible} de {self.workspace_data_table.rowCount()} registro(s) visíveis • "
+                f"{self.workspace_data_table.columnCount()} coluna(s)."
+            )
+
+    def _clear_workspace_filters(self):
+        self.workspace_search.clear()
+        self.workspace_column_filter.setCurrentIndex(0)
+        self._filter_workspace_table()
 
     @staticmethod
     def _format_sheet_preview(sheets):
