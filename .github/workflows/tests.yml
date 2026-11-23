@@ -2,7 +2,7 @@ name: Testes automatizados
 
 on:
   push:
-    branches: [main, "feature/document-control-spreadsheet-review", "feature/three-column-engineering-dashboard"]
+    branches: [main, "feature/**"]
   pull_request:
     branches: [main, "feature/document-control-spreadsheet-review", "feature/three-column-engineering-dashboard"]
   workflow_dispatch:
