@@ -14,12 +14,13 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QInputDialog,
     QLabel, QMainWindow, QMessageBox, QPushButton, QStackedWidget,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
-    QComboBox, QLineEdit,
+    QComboBox, QLineEdit, QFileDialog,
 )
 
 from app.documents.index import DocumentIndex
 from app.ui.engineering_workspace import EngineeringWorkspaceWindow
 from app.workspace.store import WorkspaceStore
+from app.workspace.exchange import SpreadsheetExchange
 from app.data.dataset_store import DEFAULT_STORE
 
 
@@ -407,7 +408,7 @@ class PonteMainWindow(QMainWindow):
         drop_layout = QVBoxLayout(drop_area)
         drop_layout.setContentsMargins(24, 28, 24, 28)
         drop_layout.setSpacing(10)
-        drop_title = QLabel("Selecione uma planilha Excel ou CSV")
+        drop_title = QLabel("Arraste um arquivo Excel ou CSV para esta área")
         drop_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_title.setStyleSheet("font-size:12pt;font-weight:700;color:#294b67;")
         drop_detail = QLabel(
@@ -415,9 +416,9 @@ class PonteMainWindow(QMainWindow):
         )
         drop_detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_detail.setObjectName("muted")
-        choose = QPushButton("Abrir gerenciador de planilhas")
+        choose = QPushButton("Selecionar arquivo")
         choose.setObjectName("primaryAction")
-        choose.clicked.connect(self.open_spreadsheet_workspace)
+        choose.clicked.connect(self.select_import_file)
         drop_layout.addWidget(drop_title)
         drop_layout.addWidget(drop_detail)
         drop_layout.addWidget(choose, 0, Qt.AlignmentFlag.AlignHCenter)
@@ -461,6 +462,105 @@ class PonteMainWindow(QMainWindow):
         )
         layout.addWidget(integrity)
         return page
+
+    def select_import_file(self):
+        """Preview a source file and import it into a selected local project after confirmation."""
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Selecionar planilha de engenharia",
+            "",
+            "Planilhas e dados (*.xlsx *.xlsm *.xls *.xlsb *.csv);;Todos os arquivos (*.*)",
+        )
+        if not path:
+            return
+
+        projects = self.store.list_projects()
+        if not projects:
+            name, accepted = QInputDialog.getText(
+                self, "Projeto de destino", "Não há projetos cadastrados. Nome do novo projeto:"
+            )
+            if not accepted or not name.strip():
+                return
+            try:
+                project_id = self.store.create_project(name.strip())
+            except Exception as exc:
+                QMessageBox.warning(self, "Projeto", str(exc))
+                return
+        else:
+            labels = [f"{item['name']}  ·  ID {item['id']}" for item in projects]
+            selected, accepted = QInputDialog.getItem(
+                self, "Projeto de destino", "Importar para:", labels, 0, False
+            )
+            if not accepted:
+                return
+            project_id = projects[labels.index(selected)]["id"]
+
+        exchange = SpreadsheetExchange(self.store)
+        suffix = Path(path).suffix.casefold()
+        try:
+            if suffix == ".csv":
+                preview = exchange.preview_csv(path, limit=5)
+                rows = preview.get("rows", [])
+                preview_text = "\n".join("  |  ".join(map(str, row[:6])) for row in rows[:6])
+            elif suffix in {".xls", ".xlsb"}:
+                preview = (
+                    exchange.preview_xls(path, limit=5)
+                    if suffix == ".xls"
+                    else exchange.preview_xlsb(path, limit=5)
+                )
+                preview_text = self._format_sheet_preview(preview.get("sheets", []))
+            elif suffix in {".xlsx", ".xlsm"}:
+                preview = exchange.preview_xlsx(path, limit=5)
+                preview_text = self._format_sheet_preview(preview.get("sheets", []))
+            else:
+                QMessageBox.warning(self, "Formato não suportado", "Selecione XLSX, XLSM, XLS, XLSB ou CSV.")
+                return
+        except Exception as exc:
+            QMessageBox.warning(self, "Não foi possível ler a planilha", str(exc))
+            return
+
+        question = QMessageBox(self)
+        question.setWindowTitle("Conferir prévia da importação")
+        question.setIcon(QMessageBox.Icon.Information)
+        question.setText(
+            f"Arquivo: {Path(path).name}\n\nPrévia das primeiras linhas:\n{preview_text[:5000]}\n\n"
+            "A importação criará uma tabela por aba (Excel) ou uma tabela (CSV). "
+            "Os valores originais não serão corrigidos automaticamente. Continuar?"
+        )
+        question.setStandardButtons(
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        question.setDefaultButton(QMessageBox.StandardButton.No)
+        if question.exec() != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            if suffix == ".csv":
+                created = [exchange.import_csv(project_id, path)]
+            elif suffix == ".xls":
+                created = exchange.import_xls(project_id, path)
+            elif suffix == ".xlsb":
+                created = exchange.import_xlsb(project_id, path)
+            else:
+                created = exchange.import_xlsx(project_id, path)
+            self.refresh_pages()
+            QMessageBox.information(
+                self,
+                "Importação concluída",
+                f"{len(created)} tabela(s) criada(s) no projeto selecionado.\n"
+                "O arquivo de origem permaneceu no local original.",
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Falha na importação", str(exc))
+
+    @staticmethod
+    def _format_sheet_preview(sheets):
+        lines = []
+        for sheet in sheets[:5]:
+            lines.append(f"Aba: {sheet.get('sheet_name', '—')}")
+            for row in sheet.get("rows", [])[:5]:
+                lines.append("  |  ".join(map(str, row[:6])))
+        return "\n".join(lines) or "Nenhuma linha encontrada na prévia."
 
     def _analysis_page(self) -> QWidget:
         """Engineering analysis layout; unavailable calculations are never fabricated."""
