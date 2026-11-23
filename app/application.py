@@ -2,12 +2,13 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from app.ui.engineering_workspace import EngineeringWorkspaceWindow
+from app.ui.ponte_shell import PonteMainWindow
 
 
 def main() -> int:
     app = QApplication(sys.argv)
-    app.setApplicationName("Gerenciador de Estruturas")
-    window = EngineeringWorkspaceWindow()
+    app.setApplicationName("PONTE")
+    app.setOrganizationName("EGT Engenharia")
+    window = PonteMainWindow()
     window.show()
     return app.exec()
