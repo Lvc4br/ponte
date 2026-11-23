@@ -9,15 +9,16 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtWidgets import (
     QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QInputDialog,
     QLabel, QMainWindow, QMessageBox, QPushButton, QStackedWidget,
-    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QDesktopServices,
     QComboBox, QLineEdit, QFileDialog, QTabWidget,
 )
 
 from app.documents.index import DocumentIndex
+from app.documents.scanner import DocumentScanner
 from app.ui.engineering_workspace import EngineeringWorkspaceWindow
 from app.workspace.store import WorkspaceStore
 from app.workspace.exchange import SpreadsheetExchange
@@ -1027,29 +1028,203 @@ class PonteMainWindow(QMainWindow):
         return page
 
     def _documents_page(self) -> QWidget:
+        """Local document catalog with search, status filtering and source inspection."""
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        panel = Panel("Documentos indexados", "Arquivos analisados e catalogados neste dispositivo")
-        docs = self.documents.list_documents()
-        panel.body.addWidget(self._metric_row([
-            MetricCard("Documentos indexados", str(len(docs)), "Catálogo local"),
-            MetricCard("Aguardando revisão", str(sum(1 for d in docs if d.get("status") not in ("ok", "completed", "success"))), "Conforme status registrado"),
-            MetricCard("Versões recentes", "Não apurado", "Versionamento documental ainda não integrado"),
-        ]))
-        table = QTableWidget(len(docs), 5)
-        table.setHorizontalHeaderLabels(["Documento", "Formato", "Situação", "Seções", "Digitalizado em"])
-        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        table.verticalHeader().setVisible(False)
-        table.horizontalHeader().setStretchLastSection(True)
-        for row, doc in enumerate(docs):
-            values = [doc.get("file_name"), doc.get("extension"), doc.get("status"),
-                      doc.get("section_count"), doc.get("scanned_at")]
+        layout.setSpacing(14)
+
+        heading = QLabel("Repositório documental do empreendimento")
+        heading.setStyleSheet("font-size:14pt;font-weight:700;color:#26384b;")
+        subtitle = QLabel(
+            "Consulte arquivos indexados neste dispositivo. O catálogo preserva o caminho, "
+            "o hash e o resultado da extração; indexação não significa aprovação técnica."
+        )
+        subtitle.setObjectName("sectionIntro")
+        subtitle.setWordWrap(True)
+        layout.addWidget(heading)
+        layout.addWidget(subtitle)
+
+        self.document_rows = self.documents.list_documents()
+        self.document_metrics = self._metric_row([
+            MetricCard("Documentos indexados", str(len(self.document_rows)), "Catálogo local"),
+            MetricCard("Extração concluída", str(sum(d.get("status") == "success" for d in self.document_rows)), "Leitura sem avisos"),
+            MetricCard("Aguardando revisão", str(sum(d.get("status") in ("partial", "error", "unsupported") for d in self.document_rows)), "Exige conferência"),
+            MetricCard("Versões", "Não apurado", "Versionamento documental ainda não integrado"),
+        ])
+        layout.addWidget(self.document_metrics)
+
+        panel = Panel("Biblioteca de documentos", "Metadados disponíveis • versões e vínculo com OAEs ainda não integrados")
+        toolbar = QHBoxLayout()
+        self.document_search = QLineEdit()
+        self.document_search.setPlaceholderText("Buscar nome, extensão ou caminho…")
+        self.document_search.textChanged.connect(self._filter_documents)
+        toolbar.addWidget(self.document_search, 2)
+        self.document_status_filter = QComboBox()
+        self.document_status_filter.addItem("Todas as situações", "")
+        self.document_type_filter = QComboBox()
+        self.document_type_filter.addItem("Todos os formatos", "")
+        for value in sorted({str(d.get("status") or "") for d in self.document_rows if d.get("status")}):
+            self.document_status_filter.addItem(value, value)
+        for value in sorted({str(d.get("extension") or "") for d in self.document_rows if d.get("extension")}):
+            self.document_type_filter.addItem(value, value)
+        self.document_status_filter.currentIndexChanged.connect(self._filter_documents)
+        self.document_type_filter.currentIndexChanged.connect(self._filter_documents)
+        toolbar.addWidget(self.document_status_filter)
+        toolbar.addWidget(self.document_type_filter)
+        add = QPushButton("+ Adicionar documento")
+        add.setObjectName("primaryAction")
+        add.clicked.connect(self.add_documents)
+        toolbar.addWidget(add)
+        panel.body.addLayout(toolbar)
+
+        self.document_table = QTableWidget(len(self.document_rows), 5)
+        self.document_table.setHorizontalHeaderLabels([
+            "Documento", "Categoria", "Vinculado a", "Tamanho", "Situação"
+        ])
+        self.document_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.document_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.document_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.document_table.verticalHeader().setVisible(False)
+        self.document_table.horizontalHeader().setStretchLastSection(True)
+        for row, doc in enumerate(self.document_rows):
+            metadata = {}
+            values = [
+                doc.get("file_name"),
+                doc.get("extension"),
+                "Não vinculado",
+                f"{doc.get('size_bytes', 0):,} bytes".replace(",", "."),
+                doc.get("status"),
+            ]
             for col, value in enumerate(values):
-                table.setItem(row, col, QTableWidgetItem(str(value if value is not None else "—")))
-        panel.body.addWidget(table, 1)
-        layout.addWidget(panel, 1)
+                self.document_table.setItem(
+                    row, col, QTableWidgetItem("Não informado" if value is None else str(value))
+                )
+        self.document_table.itemSelectionChanged.connect(self._show_selected_document)
+        panel.body.addWidget(self.document_table, 1)
+        layout.addWidget(panel, 2)
+
+        detail = Panel("Detalhes e rastreabilidade", "Selecione um documento para consultar a origem e os metadados")
+        self.document_detail = QLabel(
+            "Nenhum documento selecionado. Use “Adicionar documento” para indexar arquivos locais."
+        )
+        self.document_detail.setObjectName("sectionIntro")
+        self.document_detail.setWordWrap(True)
+        detail.body.addWidget(self.document_detail)
+        actions = QHBoxLayout()
+        self.open_document_button = QPushButton("Abrir arquivo original")
+        self.open_document_button.setObjectName("secondaryAction")
+        self.open_document_button.setEnabled(False)
+        self.open_document_button.clicked.connect(self.open_selected_document)
+        actions.addWidget(self.open_document_button)
+        actions.addStretch()
+        detail.body.addLayout(actions)
+        layout.addWidget(detail, 1)
+
+        if self.document_rows:
+            self.document_table.selectRow(0)
         return page
+
+    def _filter_documents(self, *_):
+        if not hasattr(self, "document_table"):
+            return
+        needle = self.document_search.text().strip().casefold()
+        status = self.document_status_filter.currentData()
+        extension = self.document_type_filter.currentData()
+        for row, doc in enumerate(self.document_rows):
+            matches_text = not needle or needle in " ".join(
+                str(doc.get(key) or "") for key in ("file_name", "extension", "path")
+            ).casefold()
+            matches_status = not status or doc.get("status") == status
+            matches_extension = not extension or doc.get("extension") == extension
+            self.document_table.setRowHidden(
+                row, not (matches_text and matches_status and matches_extension)
+            )
+
+    def add_documents(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Adicionar documentos ao catálogo", "",
+            "Documentos suportados (*.pdf *.doc *.docx *.ppt *.pptx *.rtf *.odt *.odp "
+            "*.xlsx *.xlsm *.xls *.xlsb *.csv *.txt *.md *.json *.xml *.dxf *.dwg "
+            "*.ifc *.rvt *.rfa *.png *.jpg *.jpeg *.tif *.tiff *.bmp *.webp *.gif);;"
+            "Todos os arquivos (*.*)"
+        )
+        if not paths:
+            return
+        try:
+            scanner = DocumentScanner()
+            results = scanner.scan_many(paths)
+            for result in results:
+                self.documents.index_result(result)
+            self.refresh_document_page()
+            failures = sum(result.status in ("error", "partial", "unsupported") for result in results)
+            QMessageBox.information(
+                self, "Indexação concluída",
+                f"{len(results)} arquivo(s) processado(s).\n"
+                f"{failures} arquivo(s) com avisos, falhas ou formato sem leitor. "
+                "A extração não representa validação técnica."
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Falha ao indexar documentos", str(exc))
+
+    def refresh_document_page(self):
+        current = self.stack.currentIndex()
+        self.stack.removeWidget(self.pages["Documentos"])
+        self.pages["Documentos"].deleteLater()
+        new_page = self._documents_page()
+        self.pages["Documentos"] = new_page
+        self.stack.insertWidget(5, new_page)
+        self.stack.setCurrentIndex(current)
+
+    def _selected_document(self):
+        if not hasattr(self, "document_table"):
+            return None
+        selected = self.document_table.selectionModel().selectedRows()
+        if not selected:
+            return None
+        return self.document_rows[selected[0].row()]
+
+    def _show_selected_document(self):
+        doc = self._selected_document()
+        if not doc:
+            self.document_detail.setText("Nenhum documento selecionado.")
+            self.open_document_button.setEnabled(False)
+            return
+        full = self.documents.get_document(doc["id"])
+        metadata = full.get("metadata", {})
+        warnings = full.get("warnings", [])
+        errors = full.get("errors", [])
+        details = [
+            f"Nome original: {full.get('file_name')}",
+            f"Caminho: {full.get('path')}",
+            f"SHA-256: {full.get('sha256')}",
+            f"Tamanho: {full.get('size_bytes')} bytes",
+            f"Formato: {full.get('extension')}",
+            f"Situação da extração: {full.get('status')}",
+            f"Seções extraídas: {len(full.get('sections', []))}",
+            f"Data da indexação: {full.get('scanned_at')}",
+            "Vínculo com projeto/OAE: não integrado",
+            "Versionamento e permissões: não integrados",
+        ]
+        if metadata:
+            details.append("Metadados: " + str(metadata))
+        if warnings:
+            details.append("Avisos: " + " | ".join(map(str, warnings)))
+        if errors:
+            details.append("Erros: " + " | ".join(map(str, errors)))
+        self.document_detail.setText("\n".join(details))
+        self.open_document_button.setEnabled(Path(full.get("path", "")).is_file())
+
+    def open_selected_document(self):
+        doc = self._selected_document()
+        if not doc:
+            return
+        full = self.documents.get_document(doc["id"])
+        path = Path(full.get("path", ""))
+        if not path.is_file():
+            QMessageBox.warning(self, "Arquivo não encontrado", "O arquivo original não está mais nesse caminho.")
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
     def _module_page(self, title: str, description: str, action: str, callback) -> QWidget:
         page = QWidget()
