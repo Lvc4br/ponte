@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.documents.index import DocumentIndex
+from app.data.dataset_store import DatasetStore
 from app.ui.engineering_workspace import EngineeringWorkspaceWindow
 from app.workspace.store import WorkspaceStore
 from app.workspace.exchange import SpreadsheetExchange
@@ -394,19 +395,145 @@ class PonteMainWindow(QMainWindow):
             QMessageBox.warning(self, "Não foi possível criar o projeto", str(exc))
 
     def _bridges_page(self) -> QWidget:
+        """Show legacy bridge records without inventing or rewriting technical values."""
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        panel = Panel("Cadastro técnico de pontes e OAEs",
-                      "O cadastro deverá reunir identificação, geometria, materiais, quantitativos, inspeções, documentos e histórico.")
-        panel.body.addWidget(QLabel(
-            "A base atual contém registros de origem, mas ainda não há uma ficha OAE integrada a este workspace. "
-            "Por isso, os registros não são apresentados como pontes cadastradas ou validadas."
-        ))
-        panel.body.addWidget(QLabel("A próxima integração necessária é o domínio de pontes/OAEs e seus repositórios persistentes."))
-        layout.addWidget(panel)
-        layout.addStretch(1)
+        intro = QLabel(
+            "Consulte os registros de pontes e OAEs importados. Os valores permanecem "
+            "vinculados à sua origem e não são tratados como validados."
+        )
+        intro.setObjectName("sectionIntro")
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        try:
+            self.bridge_records = DatasetStore().load()
+            load_error = None
+        except Exception:
+            self.bridge_records = []
+            load_error = "Não foi possível carregar os registros locais. Verifique a base de dados."
+
+        summary = self._metric_row([
+            MetricCard("Registros de origem", str(len(self.bridge_records)),
+                       "Linhas armazenadas no conjunto local"),
+            MetricCard("Com tipologia", str(sum(bool(r.get("tipo_obra")) for r in self.bridge_records)),
+                       "Campo informado na origem"),
+            MetricCard("Com geometria", str(sum(
+                r.get("compr_obra_m") is not None and r.get("largura_m") is not None
+                for r in self.bridge_records
+            )), "Comprimento e largura presentes"),
+            MetricCard("Validação técnica", "Pendente",
+                       "Cadastro e aprovação de engenharia ainda não integrados", "#c58b37"),
+        ])
+        layout.addWidget(summary)
+
+        listing = Panel("Pontes e OAEs", "Registros importados • consulta da base local")
+        self.bridge_search = QLineEdit()
+        self.bridge_search.setPlaceholderText("Buscar por código, tipologia ou valor de origem…")
+        self.bridge_search.textChanged.connect(self._filter_bridge_records)
+        listing.body.addWidget(self.bridge_search)
+
+        self.bridge_table = QTableWidget(len(self.bridge_records), 5)
+        self.bridge_table.setHorizontalHeaderLabels([
+            "Identificador", "Tipologia", "Comprimento (m)", "Largura (m)", "Vãos (m)"
+        ])
+        self.bridge_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.bridge_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.bridge_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.bridge_table.verticalHeader().setVisible(False)
+        self.bridge_table.horizontalHeader().setStretchLastSection(True)
+        for row, record in enumerate(self.bridge_records):
+            values = [
+                record.get("obra", record.source_row),
+                record.get("tipo_obra"),
+                record.get("compr_obra_m"),
+                record.get("largura_m"),
+                self._bridge_span_text(record.values),
+            ]
+            for col, value in enumerate(values):
+                self.bridge_table.setItem(
+                    row, col, QTableWidgetItem("Não informado" if value is None else str(value))
+                )
+        self.bridge_table.itemSelectionChanged.connect(self._show_selected_bridge_record)
+        listing.body.addWidget(self.bridge_table, 1)
+        layout.addWidget(listing, 2)
+
+        detail = Panel("Ficha técnica da OAE", "Selecione um registro para consultar os campos disponíveis")
+        self.bridge_detail = QLabel(
+            load_error or (
+                "Nenhum registro de ponte/OAE foi importado. Use Importar dados para adicionar "
+                "uma planilha; o arquivo original será preservado."
+                if not self.bridge_records else
+                "Selecione uma linha acima. Campos ausentes serão exibidos como “Não informado”."
+            )
+        )
+        self.bridge_detail.setWordWrap(True)
+        self.bridge_detail.setObjectName("sectionIntro")
+        detail.body.addWidget(self.bridge_detail)
+        layout.addWidget(detail, 1)
+
+        if load_error:
+            self.bridge_table.setEnabled(False)
+        elif self.bridge_records:
+            self.bridge_table.selectRow(0)
         return page
+
+    @staticmethod
+    def _bridge_span_text(values: dict) -> str:
+        minimum = values.get("vao_min_m", values.get("vão_min_m"))
+        maximum = values.get("vao_max_m", values.get("vão_max_m"))
+        if minimum is None and maximum is None:
+            return "Não informado"
+        if minimum is None:
+            return str(maximum)
+        if maximum is None or maximum == minimum:
+            return str(minimum)
+        return f"{minimum} – {maximum}"
+
+    def _filter_bridge_records(self, query: str):
+        needle = query.strip().casefold()
+        for row in range(self.bridge_table.rowCount()):
+            text_value = " ".join(
+                self.bridge_table.item(row, col).text()
+                for col in range(self.bridge_table.columnCount())
+                if self.bridge_table.item(row, col) is not None
+            ).casefold()
+            self.bridge_table.setRowHidden(row, bool(needle) and needle not in text_value)
+
+    def _show_selected_bridge_record(self):
+        selected = self.bridge_table.selectionModel().selectedRows()
+        if not selected:
+            return
+        row = selected[0].row()
+        record = self.bridge_records[row]
+        fields = [
+            ("Identificador", record.get("obra", record.source_row)),
+            ("Tipologia", record.get("tipo_obra")),
+            ("Seção", record.get("secao")),
+            ("Largura do tabuleiro", record.get("largura_m"), "m"),
+            ("Vão mínimo", record.get("vao_min_m", record.get("vão_min_m")), "m"),
+            ("Vão máximo", record.get("vao_max_m", record.get("vão_max_m")), "m"),
+            ("Comprimento total", record.get("compr_obra_m"), "m"),
+            ("Volume específico de concreto", record.get("em_m3_m2"), "m³/m²"),
+            ("Paf", record.get("Paf_kg_m2"), "kg/m²"),
+            ("Pap", record.get("Pap_kg_m2"), "kg/m²"),
+            ("Af", record.get("Af_m2_m2"), "m²/m²"),
+            ("Aço total indicativo", record.get("anc_at_pas")),
+        ]
+        parts = []
+        for item in fields:
+            label, value, *unit = item
+            rendered = "Não informado" if value is None else str(value)
+            if unit and value is not None:
+                rendered = f"{rendered} {unit[0]}"
+            parts.append(f"{label}: {rendered}")
+        source = f"Origem: {record.source_file or 'base local'}"
+        if record.source_sheet:
+            source += f" • Aba: {record.source_sheet}"
+        source += f" • Linha de origem: {record.source_row}"
+        self.bridge_detail.setText("\n".join(parts) + "\n\n" + source
+                                    + "\n\nEstado: não validado nesta ficha.")
 
     def _import_page(self) -> QWidget:
         """Import workflow screen from the approved PONTE design, not the spreadsheet grid."""
