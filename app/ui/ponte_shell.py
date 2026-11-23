@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QInputDialog,
     QLabel, QMainWindow, QMessageBox, QPushButton, QStackedWidget,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QComboBox, QLineEdit,
 )
 
 from app.documents.index import DocumentIndex
@@ -193,19 +194,10 @@ class PonteMainWindow(QMainWindow):
         self._add_page("Visão geral", self._overview_page())
         self._add_page("Projetos e obras", self._projects_page())
         self._add_page("Pontes e OAEs", self._bridges_page())
-        self._add_page("Importar dados", self._module_page(
-            "Entrada e validação de dados",
-            "Importe planilhas com prévia, mapeamento e validação antes de gravar os registros.",
-            "Abrir workspace de planilhas", self.open_spreadsheet_workspace))
-        self._add_page("Análise de engenharia", self._module_page(
-            "Filtros e indicadores de engenharia",
-            "A análise técnica comparável ainda precisa ser conectada ao domínio de pontes e ao catálogo de indicadores. Nenhum resultado demonstrativo será exibido como cálculo validado.",
-            "Abrir workspace de planilhas", self.open_spreadsheet_workspace))
+        self._add_page("Importar dados", self._import_page())
+        self._add_page("Análise de engenharia", self._analysis_page())
         self._add_page("Documentos", self._documents_page())
-        self._add_page("Relatórios", self._module_page(
-            "Relatórios e exportações",
-            "Os modelos rastreáveis de resumo executivo, comparativo de OAEs, importação e mapa de quantitativos ainda não estão integrados nesta tela.",
-            "Abrir workspace de planilhas", self.open_spreadsheet_workspace))
+        self._add_page("Relatórios", self._reports_page())
 
     def _add_page(self, name: str, page: QWidget):
         self.pages[name] = page
@@ -387,6 +379,281 @@ class PonteMainWindow(QMainWindow):
         layout.addStretch(1)
         return page
 
+    def _import_page(self) -> QWidget:
+        """Import workflow screen from the approved PONTE design, not the spreadsheet grid."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(16)
+
+        intro = QVBoxLayout()
+        heading = QLabel("Importar tabela de engenharia")
+        heading.setStyleSheet("font-size:14pt;font-weight:700;color:#26384b;")
+        subtitle = QLabel(
+            "Traga planilhas existentes para o PONTE mantendo o arquivo original, "
+            "a origem dos dados e a rastreabilidade."
+        )
+        subtitle.setObjectName("sectionIntro")
+        subtitle.setWordWrap(True)
+        intro.addWidget(heading)
+        intro.addWidget(subtitle)
+        layout.addLayout(intro)
+
+        upload = Panel("Selecionar arquivo", "Entrada de planilhas para validação")
+        drop_area = QFrame()
+        drop_area.setStyleSheet(
+            "QFrame {background:#eaf3fa;border:1px dashed #8fb4d0;border-radius:8px;}"
+        )
+        drop_layout = QVBoxLayout(drop_area)
+        drop_layout.setContentsMargins(24, 28, 24, 28)
+        drop_layout.setSpacing(10)
+        drop_title = QLabel("Selecione uma planilha Excel ou CSV")
+        drop_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        drop_title.setStyleSheet("font-size:12pt;font-weight:700;color:#294b67;")
+        drop_detail = QLabel(
+            ".xlsx  •  .xls  •  .csv     |     O arquivo original será preservado"
+        )
+        drop_detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        drop_detail.setObjectName("muted")
+        choose = QPushButton("Abrir gerenciador de planilhas")
+        choose.setObjectName("primaryAction")
+        choose.clicked.connect(self.open_spreadsheet_workspace)
+        drop_layout.addWidget(drop_title)
+        drop_layout.addWidget(drop_detail)
+        drop_layout.addWidget(choose, 0, Qt.AlignmentFlag.AlignHCenter)
+        upload.body.addWidget(drop_area)
+        layout.addWidget(upload)
+
+        steps = Panel("Etapas de importação")
+        step_data = [
+            ("01", "Selecionar arquivo", "Escolha o arquivo e as abas que deseja importar."),
+            ("02", "Conferir prévia", "Revise cabeçalhos, linhas, tipos e valores originais."),
+            ("03", "Mapear colunas", "Associe campos, unidades e escopo com confirmação."),
+            ("04", "Validar dados", "Identifique ausências, duplicidades e inconsistências."),
+            ("05", "Importar e analisar", "Grave os dados após a conferência e abra o conjunto importado."),
+        ]
+        for number, title, detail in step_data:
+            line = QHBoxLayout()
+            number_label = QLabel(number)
+            number_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            number_label.setFixedSize(38, 38)
+            number_label.setStyleSheet(
+                "background:#eaf3fa;color:#287db5;border-radius:19px;font-weight:700;"
+            )
+            texts = QVBoxLayout()
+            title_label = QLabel(title)
+            title_label.setStyleSheet("font-weight:700;color:#34485c;")
+            detail_label = QLabel(detail)
+            detail_label.setObjectName("mutedSmall")
+            texts.addWidget(title_label)
+            texts.addWidget(detail_label)
+            line.addWidget(number_label)
+            line.addLayout(texts, 1)
+            steps.body.addLayout(line)
+        layout.addWidget(steps, 1)
+
+        integrity = QLabel(
+            "Princípio de integridade: nenhuma unidade, fórmula ou valor será corrigido silenciosamente."
+        )
+        integrity.setWordWrap(True)
+        integrity.setStyleSheet(
+            "background:#fff5e5;color:#93621f;padding:12px;border-radius:6px;"
+        )
+        layout.addWidget(integrity)
+        return page
+
+    def _analysis_page(self) -> QWidget:
+        """Engineering analysis layout; unavailable calculations are never fabricated."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(14)
+
+        intro = QVBoxLayout()
+        heading = QLabel("Análise de dados de pontes e OAEs")
+        heading.setStyleSheet("font-size:14pt;font-weight:700;color:#26384b;")
+        subtitle = QLabel(
+            "Defina intervalos, combine critérios e examine apenas amostras tecnicamente comparáveis."
+        )
+        subtitle.setObjectName("sectionIntro")
+        intro.addWidget(heading)
+        intro.addWidget(subtitle)
+        layout.addLayout(intro)
+
+        scope = Panel("CONJUNTO DE DADOS", "Escopo da análise")
+        scope_row = QHBoxLayout()
+        dataset = QComboBox()
+        dataset.addItem("Conjuntos importados — integração pendente")
+        dataset.setEnabled(False)
+        entity_scope = QComboBox()
+        entity_scope.addItem("Todas as OAEs — cadastro não integrado")
+        entity_scope.setEnabled(False)
+        scope_row.addWidget(QLabel("Conjunto"))
+        scope_row.addWidget(dataset, 2)
+        scope_row.addWidget(QLabel("Escopo"))
+        scope_row.addWidget(entity_scope, 2)
+        scope.body.addLayout(scope_row)
+        layout.addWidget(scope)
+
+        content = QHBoxLayout()
+        filters = Panel("Filtros por intervalo", "Campos previstos no design de análise")
+        filter_grid = QGridLayout()
+        filter_grid.addWidget(QLabel("Grandeza"), 0, 0)
+        filter_grid.addWidget(QLabel("Mínimo"), 0, 1)
+        filter_grid.addWidget(QLabel("Máximo"), 0, 2)
+        for row, label in enumerate(
+            ("Comprimento total (m)", "Largura do tabuleiro (m)",
+             "Área do tabuleiro (m²)", "Volume de concreto (m³)"), start=1
+        ):
+            filter_grid.addWidget(QLabel(label), row, 0)
+            minimum = QLineEdit()
+            maximum = QLineEdit()
+            minimum.setPlaceholderText("Mín.")
+            maximum.setPlaceholderText("Máx.")
+            minimum.setEnabled(False)
+            maximum.setEnabled(False)
+            filter_grid.addWidget(minimum, row, 1)
+            filter_grid.addWidget(maximum, row, 2)
+        filters.body.addLayout(filter_grid)
+        filter_note = QLabel(
+            "Filtros serão habilitados quando o repositório de OAEs e os campos geométricos "
+            "estiverem conectados."
+        )
+        filter_note.setObjectName("mutedSmall")
+        filter_note.setWordWrap(True)
+        filters.body.addWidget(filter_note)
+        content.addWidget(filters, 1)
+
+        results = Panel("Resultados da seleção", "Indicadores de engenharia — sem valores presumidos")
+        metrics = QGridLayout()
+        metric_names = [
+            ("Paf", "kg/m²"), ("Pap", "kg/m²"), ("Ecm", "m³/m²"),
+            ("Af", "m²/m²"), ("Aço total indicativo", "kg/m²"),
+            ("Aço total indicativo", "kg/m³"),
+        ]
+        for index, (name, unit) in enumerate(metric_names):
+            card = QFrame()
+            card.setStyleSheet(
+                "QFrame {background:#eaf3fa;border:1px solid #d7e6f1;border-radius:6px;}"
+            )
+            box = QVBoxLayout(card)
+            box.setContentsMargins(10, 9, 10, 9)
+            label = QLabel(name)
+            label.setObjectName("mutedSmall")
+            value = QLabel("Não calculado")
+            value.setStyleSheet("font-size:14pt;font-weight:700;color:#294b67;")
+            unit_label = QLabel(unit + " • fórmula/validação pendente")
+            unit_label.setObjectName("mutedSmall")
+            unit_label.setWordWrap(True)
+            box.addWidget(label)
+            box.addWidget(value)
+            box.addWidget(unit_label)
+            metrics.addWidget(card, index // 3, index % 3)
+        results.body.addLayout(metrics)
+
+        table = QTableWidget(0, 6)
+        table.setHorizontalHeaderLabels(
+            ["Identificação", "Tipologia", "Vão total (m)", "Concreto (m³)", "Aço (kg)", "Status"]
+        )
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setStretchLastSection(True)
+        table.setMinimumHeight(170)
+        results.body.addWidget(table, 1)
+        empty = QLabel(
+            "Nenhuma amostra exibida. O cadastro técnico e os critérios de comparabilidade "
+            "ainda não estão conectados."
+        )
+        empty.setObjectName("mutedSmall")
+        empty.setWordWrap(True)
+        results.body.addWidget(empty)
+        content.addWidget(results, 2)
+        layout.addLayout(content, 1)
+
+        note = QLabel(
+            "Nota metodológica: Paf, Pap, Ecm, Af e os indicadores de aço dependem de "
+            "definições, unidades e fórmulas aprovadas pela EGT. Nenhum resultado é estimado nesta tela."
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet("background:#fff5e5;color:#93621f;padding:11px;border-radius:6px;")
+        layout.addWidget(note)
+        return page
+
+    def _reports_page(self) -> QWidget:
+        """Report catalog layout; generation stays disabled until validated data exists."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(14)
+
+        heading = QLabel("Transforme análises em entregáveis rastreáveis")
+        heading.setStyleSheet("font-size:14pt;font-weight:700;color:#26384b;")
+        subtitle = QLabel(
+            "Gere relatórios a partir de conjuntos filtrados, preservando metodologia, versão e evidências."
+        )
+        subtitle.setObjectName("sectionIntro")
+        layout.addWidget(heading)
+        layout.addWidget(subtitle)
+
+        models = Panel(
+            "Modelos de relatório",
+            "A geração será habilitada quando os dados e as fórmulas estiverem validados."
+        )
+        row = QHBoxLayout()
+        for title, detail in [
+            ("Resumo executivo", "Indicadores gerais, escopo e pendências."),
+            ("Comparativo de OAEs", "Amostras compatíveis e critérios aplicados."),
+            ("Relatório de importação", "Origem, mapeamento e validações."),
+            ("Mapa de quantitativos", "Valores por OAE e status de validação."),
+        ]:
+            card = QFrame()
+            card.setStyleSheet(
+                "QFrame {background:#eaf3fa;border:1px solid #d7e6f1;border-radius:7px;}"
+            )
+            box = QVBoxLayout(card)
+            box.setContentsMargins(12, 12, 12, 12)
+            name = QLabel(title)
+            name.setStyleSheet("font-weight:700;color:#294b67;")
+            desc = QLabel(detail)
+            desc.setObjectName("mutedSmall")
+            desc.setWordWrap(True)
+            action = QPushButton("Aguardando integração")
+            action.setEnabled(False)
+            box.addWidget(name)
+            box.addWidget(desc)
+            box.addStretch()
+            box.addWidget(action)
+            row.addWidget(card, 1)
+        models.body.addLayout(row)
+        layout.addWidget(models)
+
+        history = Panel(
+            "Histórico de relatórios",
+            "Filtros, escopo, versão do cálculo e data de geração"
+        )
+        table = QTableWidget(0, 6)
+        table.setHorizontalHeaderLabels(
+            ["Relatório", "Escopo", "Formato", "Gerado em", "Versão", "Status"]
+        )
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setStretchLastSection(True)
+        history.body.addWidget(table, 1)
+        empty = QLabel("Nenhum relatório foi gerado neste workspace.")
+        empty.setObjectName("mutedSmall")
+        history.body.addWidget(empty)
+        layout.addWidget(history, 1)
+
+        note = QLabel(
+            "Todo relatório deverá exibir filtros, tamanho e critérios da amostra, exclusões, "
+            "unidades, origem, fórmulas e versão metodológica. Estimativas não serão apresentadas "
+            "como quantitativos executivos."
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet("background:#fff5e5;color:#93621f;padding:11px;border-radius:6px;")
+        layout.addWidget(note)
+        return page
+
     def _documents_page(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -430,8 +697,12 @@ class PonteMainWindow(QMainWindow):
         return page
 
     def open_spreadsheet_workspace(self):
+        """Open the spreadsheet editor as an auxiliary tool, not as a PONTE module page."""
         if self.legacy_window is None:
             self.legacy_window = EngineeringWorkspaceWindow()
+            self.legacy_window.setWindowTitle(
+                "PONTE | Ferramenta auxiliar de planilhas"
+            )
         self.legacy_window.show()
         self.legacy_window.raise_()
         self.legacy_window.activateWindow()
