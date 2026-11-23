@@ -10,10 +10,11 @@ import sqlite3
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QInputDialog,
     QLabel, QMainWindow, QMessageBox, QPushButton, QStackedWidget,
-    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QDesktopServices,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
     QComboBox, QLineEdit, QFileDialog, QTabWidget,
 )
 
