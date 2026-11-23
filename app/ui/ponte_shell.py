@@ -428,10 +428,10 @@ class PonteMainWindow(QMainWindow):
         steps = Panel("Etapas de importação")
         step_data = [
             ("01", "Selecionar arquivo", "Escolha o arquivo e as abas que deseja importar."),
-            ("02", "Conferir prévia", "Revise cabeçalhos, linhas, tipos e valores originais."),
-            ("03", "Mapear colunas", "Associe campos, unidades e escopo com confirmação."),
-            ("04", "Validar dados", "Identifique ausências, duplicidades e inconsistências."),
-            ("05", "Importar e analisar", "Grave os dados após a conferência e abra o conjunto importado."),
+            ("02", "Conferir prévia", "Revise as primeiras linhas, cabeçalhos e valores originais."),
+            ("03", "Mapear colunas e unidades", "Etapa de mapeamento técnico ainda em preparação; os cabeçalhos originais são preservados."),
+            ("04", "Validar dados", "A validação de unidades, duplicidades e comparabilidade de engenharia ainda não está integrada."),
+            ("05", "Importar e analisar", "A importação genérica está disponível; a análise técnica depende das etapas anteriores."),
         ]
         for number, title, detail in step_data:
             line = QHBoxLayout()
