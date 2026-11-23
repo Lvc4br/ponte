@@ -74,6 +74,34 @@ class Panel(QFrame):
             self.body.addWidget(detail)
 
 
+class FileDropFrame(QFrame):
+    """Drop target that forwards one supported local file to the import flow."""
+
+    def __init__(self, on_file_dropped):
+        super().__init__()
+        self._on_file_dropped = on_file_dropped
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        urls = event.mimeData().urls() if event.mimeData().hasUrls() else []
+        if any(url.isLocalFile() for url in urls):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls() if event.mimeData().hasUrls() else []
+        supported = {".xlsx", ".xlsm", ".xls", ".xlsb", ".csv"}
+        for url in urls:
+            if url.isLocalFile():
+                path = url.toLocalFile()
+                if Path(path).suffix.casefold() in supported:
+                    self._on_file_dropped(path)
+                    event.acceptProposedAction()
+                    return
+        event.ignore()
+
+
 class PonteMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -401,7 +429,7 @@ class PonteMainWindow(QMainWindow):
         layout.addLayout(intro)
 
         upload = Panel("Selecionar arquivo", "Entrada de planilhas para validação")
-        drop_area = QFrame()
+        drop_area = FileDropFrame(self.select_import_file)
         drop_area.setStyleSheet(
             "QFrame {background:#eaf3fa;border:1px dashed #8fb4d0;border-radius:8px;}"
         )
@@ -463,14 +491,16 @@ class PonteMainWindow(QMainWindow):
         layout.addWidget(integrity)
         return page
 
-    def select_import_file(self):
+    def select_import_file(self, selected_path=None):
         """Preview a source file and import it into a selected local project after confirmation."""
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Selecionar planilha de engenharia",
-            "",
-            "Planilhas e dados (*.xlsx *.xlsm *.xls *.xlsb *.csv);;Todos os arquivos (*.*)",
-        )
+        path = selected_path
+        if not path:
+            path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Selecionar planilha de engenharia",
+                "",
+                "Planilhas e dados (*.xlsx *.xlsm *.xls *.xlsb *.csv);;Todos os arquivos (*.*)",
+            )
         if not path:
             return
 
