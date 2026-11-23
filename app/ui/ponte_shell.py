@@ -408,7 +408,7 @@ class PonteMainWindow(QMainWindow):
         drop_layout = QVBoxLayout(drop_area)
         drop_layout.setContentsMargins(24, 28, 24, 28)
         drop_layout.setSpacing(10)
-        drop_title = QLabel("Arraste um arquivo Excel ou CSV para esta área")
+        drop_title = QLabel("Selecione uma planilha Excel ou CSV para pré-visualizar")
         drop_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_title.setStyleSheet("font-size:12pt;font-weight:700;color:#294b67;")
         drop_detail = QLabel(
