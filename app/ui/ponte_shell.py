@@ -22,6 +22,7 @@ from app.ui.engineering_workspace import EngineeringWorkspaceWindow
 from app.workspace.store import WorkspaceStore
 from app.workspace.exchange import SpreadsheetExchange
 from app.data.dataset_store import DEFAULT_STORE, DatasetStore
+from app.core.bridge_formatters import bridge_span_text
 
 
 NAV_ITEMS = [
@@ -558,15 +559,7 @@ class PonteMainWindow(QMainWindow):
 
     @staticmethod
     def _bridge_span_text(values: dict) -> str:
-        minimum = values.get("vao_min_m", values.get("vão_min_m"))
-        maximum = values.get("vao_max_m", values.get("vão_max_m"))
-        if minimum is None and maximum is None:
-            return "Não informado"
-        if minimum is None:
-            return str(maximum)
-        if maximum is None or maximum == minimum:
-            return str(minimum)
-        return f"{minimum} – {maximum}"
+        return bridge_span_text(values)
 
     def _filter_bridge_records(self, query: str):
         needle = query.strip().casefold()
