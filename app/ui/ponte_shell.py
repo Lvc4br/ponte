@@ -515,11 +515,11 @@ class PonteMainWindow(QMainWindow):
             ("Vão mínimo", record.get("vao_min_m", record.get("vão_min_m")), "m"),
             ("Vão máximo", record.get("vao_max_m", record.get("vão_max_m")), "m"),
             ("Comprimento total", record.get("compr_obra_m"), "m"),
-            ("Volume específico de concreto", record.get("em_m3_m2"), "m³/m²"),
+            ("Ecm (campo da origem; unidade provisória)", record.get("em_m3_m2"), "m³/m²"),
             ("Paf", record.get("Paf_kg_m2"), "kg/m²"),
             ("Pap", record.get("Pap_kg_m2"), "kg/m²"),
             ("Af", record.get("Af_m2_m2"), "m²/m²"),
-            ("Aço total indicativo", record.get("anc_at_pas")),
+            ("anc_at_pas (campo original; significado a confirmar)", record.get("anc_at_pas")),
         ]
         parts = []
         for item in fields:
