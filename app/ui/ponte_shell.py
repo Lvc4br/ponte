@@ -14,7 +14,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QInputDialog,
     QLabel, QMainWindow, QMessageBox, QPushButton, QStackedWidget,
-    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QScrollArea,
     QComboBox, QLineEdit, QFileDialog, QTabWidget,
 )
 
@@ -653,20 +653,34 @@ class PonteMainWindow(QMainWindow):
         )
 
     def _import_page(self) -> QWidget:
-        """Import workflow screen from the approved PONTE design, not the spreadsheet grid."""
+        """Import workflow with scroll-safe controls and a usable records grid."""
         page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(16)
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        page_layout.setSpacing(0)
+
+        # Keep the entire workflow reachable at different resolutions and DPI scales.
+        scroll = QScrollArea()
+        scroll.setObjectName("importPageScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 8, 0)
+        layout.setSpacing(12)
 
         intro = QVBoxLayout()
+        intro.setSpacing(5)
         heading = QLabel("Importar tabela de engenharia")
+        heading.setMinimumHeight(30)
         heading.setStyleSheet("font-size:14pt;font-weight:700;color:#26384b;")
         subtitle = QLabel(
             "Traga planilhas existentes para o PONTE mantendo o arquivo original, "
             "a origem dos dados e a rastreabilidade."
         )
         subtitle.setObjectName("sectionIntro")
+        subtitle.setMinimumHeight(24)
         subtitle.setWordWrap(True)
         intro.addWidget(heading)
         intro.addWidget(subtitle)
@@ -674,22 +688,28 @@ class PonteMainWindow(QMainWindow):
 
         upload = Panel("Selecionar arquivo", "Entrada de planilhas para validação")
         drop_area = FileDropFrame(self.select_import_file)
+        drop_area.setMinimumHeight(116)
         drop_area.setStyleSheet(
             "QFrame {background:#eaf3fa;border:1px dashed #8fb4d0;border-radius:8px;}"
         )
         drop_layout = QVBoxLayout(drop_area)
-        drop_layout.setContentsMargins(24, 28, 24, 28)
-        drop_layout.setSpacing(10)
+        drop_layout.setContentsMargins(20, 12, 20, 12)
+        drop_layout.setSpacing(6)
         drop_title = QLabel("Selecione uma planilha Excel ou CSV para pré-visualizar")
         drop_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        drop_title.setMinimumHeight(28)
+        drop_title.setWordWrap(True)
         drop_title.setStyleSheet("font-size:12pt;font-weight:700;color:#294b67;")
         drop_detail = QLabel(
             ".xlsx  •  .xls  •  .csv     |     O arquivo original será preservado"
         )
         drop_detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        drop_detail.setMinimumHeight(24)
+        drop_detail.setWordWrap(True)
         drop_detail.setObjectName("muted")
         choose = QPushButton("Selecionar arquivo")
         choose.setObjectName("primaryAction")
+        choose.setMinimumHeight(40)
         choose.clicked.connect(self.select_import_file)
         drop_layout.addWidget(drop_title)
         drop_layout.addWidget(drop_detail)
@@ -705,36 +725,62 @@ class PonteMainWindow(QMainWindow):
             ("04", "Validar dados", "A validação de unidades, duplicidades e comparabilidade de engenharia ainda não está integrada."),
             ("05", "Importar e analisar", "A importação genérica está disponível; a análise técnica depende das etapas anteriores."),
         ]
-        for number, title, detail in step_data:
-            line = QHBoxLayout()
+        step_grid = QGridLayout()
+        step_grid.setContentsMargins(0, 2, 0, 2)
+        step_grid.setHorizontalSpacing(9)
+        step_grid.setVerticalSpacing(8)
+        for column, (number, title, detail) in enumerate(step_data):
+            card = QFrame()
+            card.setObjectName("importStepCard")
+            card.setStyleSheet(
+                "QFrame#importStepCard {background:#f7f9fb;border:1px solid #e4eaf0;border-radius:7px;}"
+            )
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(9, 8, 9, 8)
+            card_layout.setSpacing(6)
+            step_heading = QHBoxLayout()
+            step_heading.setSpacing(7)
             number_label = QLabel(number)
             number_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            number_label.setFixedSize(38, 38)
+            number_label.setFixedSize(30, 30)
             number_label.setStyleSheet(
-                "background:#eaf3fa;color:#287db5;border-radius:19px;font-weight:700;"
+                "background:#eaf3fa;color:#287db5;border-radius:15px;font-weight:700;"
             )
-            texts = QVBoxLayout()
             title_label = QLabel(title)
+            title_label.setMinimumHeight(26)
+            title_label.setWordWrap(True)
             title_label.setStyleSheet("font-weight:700;color:#34485c;")
+            step_heading.addWidget(number_label, 0, Qt.AlignmentFlag.AlignTop)
+            step_heading.addWidget(title_label, 1)
             detail_label = QLabel(detail)
+            detail_label.setMinimumHeight(36)
+            detail_label.setWordWrap(True)
+            detail_label.setAlignment(Qt.AlignmentFlag.AlignTop)
             detail_label.setObjectName("mutedSmall")
-            texts.addWidget(title_label)
-            texts.addWidget(detail_label)
-            line.addWidget(number_label)
-            line.addLayout(texts, 1)
-            steps.body.addLayout(line)
-        layout.addWidget(steps, 1)
+            card_layout.addLayout(step_heading)
+            card_layout.addWidget(detail_label, 1)
+            step_grid.addWidget(card, 0, column)
+        steps.body.addLayout(step_grid)
+        layout.addWidget(steps)
 
         # Browser for generic imported workspace tables.
-        data_panel = Panel("Tabelas importadas", "Consulte os registros gravados no workspace sem alterar os valores originais.")
+        data_panel = Panel(
+            "Tabelas importadas",
+            "Consulte os registros gravados no workspace sem alterar os valores originais."
+        )
         selectors = QHBoxLayout()
+        selectors.setSpacing(8)
         self.workspace_project_combo = QComboBox()
+        self.workspace_project_combo.setMinimumHeight(38)
         self.workspace_project_combo.currentIndexChanged.connect(self._refresh_workspace_table_choices)
         self.workspace_table_combo = QComboBox()
+        self.workspace_table_combo.setMinimumHeight(38)
         self.workspace_table_combo.currentIndexChanged.connect(self._load_workspace_table)
         self.workspace_column_filter = QComboBox()
+        self.workspace_column_filter.setMinimumHeight(40)
         self.workspace_column_filter.addItem("Todas as colunas", "")
         self.workspace_search = QLineEdit()
+        self.workspace_search.setMinimumHeight(40)
         self.workspace_search.setPlaceholderText("Pesquisar em todos os campos…")
         self.workspace_search.textChanged.connect(self._filter_workspace_table)
         selectors.addWidget(QLabel("Projeto"))
@@ -742,19 +788,28 @@ class PonteMainWindow(QMainWindow):
         selectors.addWidget(QLabel("Tabela"))
         selectors.addWidget(self.workspace_table_combo, 1)
         data_panel.body.addLayout(selectors)
+
         filter_row = QHBoxLayout()
+        filter_row.setSpacing(8)
         filter_row.addWidget(QLabel("Filtrar coluna"))
         filter_row.addWidget(self.workspace_column_filter)
         filter_row.addWidget(self.workspace_search, 2)
         clear_filter = QPushButton("Limpar filtros")
         clear_filter.setObjectName("secondaryAction")
+        clear_filter.setMinimumHeight(42)
         clear_filter.clicked.connect(self._clear_workspace_filters)
         filter_row.addWidget(clear_filter)
         data_panel.body.addLayout(filter_row)
-        self.workspace_table_status = QLabel("Selecione um projeto e uma tabela para visualizar os registros.")
+
+        self.workspace_table_status = QLabel(
+            "Selecione um projeto e uma tabela para visualizar os registros."
+        )
+        self.workspace_table_status.setMinimumHeight(24)
         self.workspace_table_status.setObjectName("muted")
         data_panel.body.addWidget(self.workspace_table_status)
+
         self.workspace_data_table = QTableWidget(0, 0)
+        self.workspace_data_table.setMinimumHeight(280)
         self.workspace_data_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.workspace_data_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.workspace_data_table.setAlternatingRowColors(True)
@@ -762,18 +817,23 @@ class PonteMainWindow(QMainWindow):
         self.workspace_data_table.setWordWrap(False)
         self.workspace_data_table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.workspace_data_table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.workspace_data_table.verticalHeader().setDefaultSectionSize(28)
         data_panel.body.addWidget(self.workspace_data_table, 1)
-        layout.addWidget(data_panel, 2)
+        layout.addWidget(data_panel, 1)
         self._refresh_workspace_project_choices()
 
         integrity = QLabel(
             "Princípio de integridade: nenhuma unidade, fórmula ou valor será corrigido silenciosamente."
         )
+        integrity.setMinimumHeight(38)
         integrity.setWordWrap(True)
         integrity.setStyleSheet(
-            "background:#fff5e5;color:#93621f;padding:12px;border-radius:6px;"
+            "background:#fff5e5;color:#93621f;padding:10px;border-radius:6px;"
         )
         layout.addWidget(integrity)
+
+        scroll.setWidget(content)
+        page_layout.addWidget(scroll)
         return page
 
     def select_import_file(self, selected_path=None):
