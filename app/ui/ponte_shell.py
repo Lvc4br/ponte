@@ -312,34 +312,56 @@ class PonteMainWindow(QMainWindow):
             for row in rows
         )
         missing_geometry = (
-            sum(any(not self._filled(row.get(name)) for name in geometry_columns) for row in rows)
+            sum(any(not self._filled(self._pick_value(row, name)) for name in geometry_columns) for row in rows)
             if geometry_columns else None
         )
         quantity_columns = [
-            name for name in columns
-            if any(token in name for token in ("paf", "pap", "ecm", "af_", "aco", "aço", "concreto", "m3_m2", "kg_m2"))
+            column["name"] for column in dataset["columns"]
+            if any(token in column["name"].casefold() for token in (
+                "paf", "pap", "ecm", "af_", "aco", "aço", "concreto", "m3_m2", "kg_m2"
+            ))
         ]
+        # Only flag repeated quantity tuples for the same identified structure.
+        # Equal quantities on different OAEs are not automatically duplicates.
         duplicate_quantities = None
-        if quantity_columns:
+        if quantity_columns and identifiers:
             seen = set()
             duplicate_quantities = 0
             for row in rows:
-                key = tuple(str(row.get(name)) for name in quantity_columns)
-                if not any(self._filled(row.get(name)) for name in quantity_columns):
+                identifier = self._pick_value(
+                    row, "obra", "identificador", "codigo_oae", "código_oae", "id_oae", "oae"
+                )
+                quantities = tuple(
+                    str(self._pick_value(row, name)) for name in quantity_columns
+                )
+                if not self._filled(identifier) or not any(
+                    self._filled(self._pick_value(row, name)) for name in quantity_columns
+                ):
                     continue
+                key = (str(identifier).strip(), quantities)
                 if key in seen:
                     duplicate_quantities += 1
                 else:
                     seen.add(key)
-        # The generic workspace schema does not persist a source-file field per row.
+        # Generic workspace records currently have no per-row source-file metadata.
         missing_origin = sum(
             not self._filled(self._pick_value(row, "origem", "source_file", "arquivo_origem", "fonte", "arquivo"))
             for row in rows
         )
+        pending_records = 0
+        for row in rows:
+            lacks_type = not self._filled(self._pick_value(row, *type_aliases))
+            lacks_geometry = (
+                any(not self._filled(self._pick_value(row, name)) for name in geometry_columns)
+                if geometry_columns else False
+            )
+            if lacks_type or lacks_geometry:
+                pending_records += 1
         return {
             "records": len(rows), "typology": typology, "identifiers": len(identifiers),
             "geometry": geometry, "missing_geometry": missing_geometry,
             "duplicate_quantities": duplicate_quantities, "missing_origin": missing_origin,
+            "pending_records": pending_records,
         }
 
     def _overview_page(self) -> QWidget:
@@ -381,10 +403,7 @@ class PonteMainWindow(QMainWindow):
             ) for item in datasets
         )
         qualities = [self._dataset_quality(item) for item in datasets]
-        pending = sum(
-            (item["missing_geometry"] or 0) + max(0, item["records"] - item["typology"])
-            for item in qualities
-        )
+        pending = sum(item["pending_records"] for item in qualities)
         layout.addWidget(self._metric_row([
             MetricCard("Projetos cadastrados", str(len(projects)), "Projetos no workspace local"),
             MetricCard("Registros de origem", str(total_records), "Linhas importadas; não equivalem automaticamente a OAEs"),
@@ -510,7 +529,7 @@ class PonteMainWindow(QMainWindow):
                     )
                     if self._filled(identifier):
                         identifiers.add(str(identifier).strip())
-                if (quality["missing_geometry"] or 0) > 0 or quality["typology"] < quality["records"]:
+                if quality["pending_records"] > 0:
                     has_pending = True
             stats_by_project[project["id"]] = {
                 "oae_count": len(identifiers), "pending": has_pending
