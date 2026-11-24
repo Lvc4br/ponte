@@ -1404,7 +1404,7 @@ class PonteMainWindow(QMainWindow):
         right.setSpacing(12)
         indicators = Panel(
             "Médias dos indicadores de engenharia",
-            "Média aritmética descritiva das OAEs do tipo selecionado, após os filtros ativos."
+            "Média aritmética descritiva dos registros exibidos; o tipo de obra e os filtros numéricos são opcionais."
         )
         metric_grid = QGridLayout()
         metric_grid.setHorizontalSpacing(10)
@@ -1657,13 +1657,15 @@ class PonteMainWindow(QMainWindow):
         self.analysis_table.setUpdatesEnabled(True)
         message = (
             f"{len(selected)} de {len(records)} registros exibidos"
-            + (f" · tipo: {selected_type}" if selected_type else " · selecione um tipo para calcular médias")
+            + (f" · tipo: {selected_type}" if selected_type else " · todos os tipos")
             + (f" · {len(active_ranges)} intervalo(s) ativo(s)" if active_ranges else "")
             + (" · pesquisa textual ativa" if needle else "")
         )
         self.analysis_count.setText(message)
         self.analysis_results_count.setText(message)
-        self._update_analysis_indicators(selected if selected_type else [])
+        # A média usa exatamente o recorte exibido. Sem tipo selecionado, considera todos os tipos;
+        # filtros numéricos isolados (inclusive somente máximo) também geram médias.
+        self._update_analysis_indicators(selected)
         if len(selected) == 1:
             self.analysis_table.selectRow(0)
 
@@ -1725,8 +1727,8 @@ class PonteMainWindow(QMainWindow):
                 display = "Sem dados válidos"
                 count_text = f"N = 0 · {missing} ausente(s)"
             else:
-                display = "Selecione um tipo"
-                count_text = "Média não calculada"
+                display = "Sem registros no recorte"
+                count_text = "N = 0 · nenhum registro para calcular"
             value_label.setText(display)
             count_label.setText(count_text)
 
