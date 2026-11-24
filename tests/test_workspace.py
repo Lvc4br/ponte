@@ -341,7 +341,10 @@ def test_oae_work_type_classification_rejects_unknown_type_and_cascades_on_delet
 def test_workspace_schema_v2_migrates_additively_to_v3(tmp_path):
     import sqlite3
     path = tmp_path / "migration_v2.sqlite3"
-    store, project = build_store(tmp_path)
+    from app.documents.index import DocumentIndex
+    DocumentIndex(path)
+    store = WorkspaceStore(path)
+    project = store.create_project("Legado v2")
     table = store.create_table(project, "Tabela")
     store.add_column(table, "Valor")
     record = store.insert_record(table, {"Valor": "preservado"})
