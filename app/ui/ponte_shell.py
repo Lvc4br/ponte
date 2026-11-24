@@ -261,10 +261,96 @@ class PonteMainWindow(QMainWindow):
             layout.addWidget(card, 1)
         return row
 
+    def _workspace_datasets(self):
+        """Return every imported workspace table with its schema and records."""
+        result = []
+        for project in self.store.list_projects():
+            for table in self.store.list_tables(project["id"]):
+                result.append({
+                    "project": project,
+                    "table": table,
+                    "columns": self.store.list_columns(table["id"]),
+                    "records": self.store.list_records(table["id"]),
+                })
+        return result
+
+    @staticmethod
+    def _filled(value):
+        return value is not None and str(value).strip() not in ("", "—", "-", "nan", "None")
+
+    @staticmethod
+    def _pick_value(values, *names):
+        for name in names:
+            if name in values and values[name] not in (None, ""):
+                return values[name]
+        folded = {str(key).strip().casefold(): value for key, value in values.items()}
+        for name in names:
+            value = folded.get(str(name).strip().casefold())
+            if value not in (None, ""):
+                return value
+        return None
+
+    def _dataset_quality(self, dataset):
+        rows = [record["values"] for record in dataset["records"]]
+        columns = {column["name"].casefold() for column in dataset["columns"]}
+        type_aliases = ("tipo_obra", "tipologia", "tipologia_obra", "tipo")
+        length_aliases = ("compr_obra_m", "comprimento_total_m", "comprimento_m")
+        width_aliases = ("largura_m", "largura_tabuleiro_m", "largura")
+        span_aliases = ("vão_m", "vao_m", "vão_total_m", "vao_total_m", "vao_max_m", "vão_max_m")
+        geometry_aliases = length_aliases + width_aliases + span_aliases
+        geometry_columns = [name for name in geometry_aliases if name.casefold() in columns]
+        typology = sum(self._filled(self._pick_value(row, *type_aliases)) for row in rows)
+        identifiers = {
+            str(self._pick_value(row, "obra", "identificador", "codigo_oae", "código_oae", "id_oae", "oae")).strip()
+            for row in rows
+            if self._filled(self._pick_value(row, "obra", "identificador", "codigo_oae", "código_oae", "id_oae", "oae"))
+        }
+        geometry = sum(
+            self._filled(self._pick_value(row, *length_aliases))
+            and self._filled(self._pick_value(row, *width_aliases))
+            for row in rows
+        )
+        missing_geometry = (
+            sum(any(not self._filled(row.get(name)) for name in geometry_columns) for row in rows)
+            if geometry_columns else None
+        )
+        quantity_columns = [
+            name for name in columns
+            if any(token in name for token in ("paf", "pap", "ecm", "af_", "aco", "aço", "concreto", "m3_m2", "kg_m2"))
+        ]
+        duplicate_quantities = None
+        if quantity_columns:
+            seen = set()
+            duplicate_quantities = 0
+            for row in rows:
+                key = tuple(str(row.get(name)) for name in quantity_columns)
+                if not any(self._filled(row.get(name)) for name in quantity_columns):
+                    continue
+                if key in seen:
+                    duplicate_quantities += 1
+                else:
+                    seen.add(key)
+        # The generic workspace schema does not persist a source-file field per row.
+        missing_origin = sum(
+            not self._filled(self._pick_value(row, "origem", "source_file", "arquivo_origem", "fonte", "arquivo"))
+            for row in rows
+        )
+        return {
+            "records": len(rows), "typology": typology, "identifiers": len(identifiers),
+            "geometry": geometry, "missing_geometry": missing_geometry,
+            "duplicate_quantities": duplicate_quantities, "missing_origin": missing_origin,
+        }
+
     def _overview_page(self) -> QWidget:
         page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 8, 8)
         layout.setSpacing(16)
 
         intro = QHBoxLayout()
@@ -284,43 +370,75 @@ class PonteMainWindow(QMainWindow):
         layout.addLayout(intro)
 
         projects = self.store.list_projects()
-        try:
-            with sqlite3.connect(DEFAULT_STORE) as db:
-                bridge_count = db.execute("SELECT COUNT(*) FROM records").fetchone()[0]
-        except sqlite3.Error:
-            bridge_count = 0
+        datasets = self._workspace_datasets()
+        total_records = sum(item["records"] for item in datasets)
+        total_identified = sum(self._dataset_quality(item)["identifiers"] for item in datasets)
+        candidates = sum(
+            bool(item["records"]) and any(
+                column.get("data_type") in ("integer", "decimal")
+                for column in item["columns"]
+            ) for item in datasets
+        )
+        qualities = [self._dataset_quality(item) for item in datasets]
+        pending = sum(
+            (item["missing_geometry"] or 0) + max(0, item["records"] - item["typology"])
+            for item in qualities
+        )
         layout.addWidget(self._metric_row([
-            MetricCard("Projetos cadastrados", str(len(projects)), "Projetos registrados no workspace local"),
-            MetricCard("Registros de origem", str(bridge_count), "Registros importados; ainda não equivalem a OAEs validadas", "#4d9b8a"),
-            MetricCard("Dados pendentes", "Não apurado", "A fila de validação ainda não está integrada", "#c58b3e"),
-            MetricCard("Conjuntos analisáveis", "Não apurado", "Compatibilidade técnica ainda não calculada", "#4d9b8a"),
+            MetricCard("Projetos cadastrados", str(len(projects)), "Projetos no workspace local"),
+            MetricCard("Registros de origem", str(total_records), "Linhas importadas; não equivalem automaticamente a OAEs"),
+            MetricCard("Dados pendentes", str(pending), "Registros com tipologia ou geometria ausente", "#c58b3e"),
+            MetricCard("Conjuntos candidatos", str(candidates), "Tabelas com dados numéricos; comparabilidade ainda não validada", "#4d9b8a"),
         ]))
 
         middle = QHBoxLayout()
-        activity = Panel("Atividade recente", "Movimentações registradas no workspace")
-        empty = QLabel("Nenhuma atividade recente disponível. O histórico de auditoria ainda não está integrado.")
-        empty.setObjectName("muted")
-        empty.setWordWrap(True)
-        activity.body.addWidget(empty)
+        activity = Panel("Atividade recente", "Datas dos registros locais • não representa um log de auditoria")
+        events = []
+        for dataset in datasets:
+            for record in dataset["records"]:
+                stamp = record.get("updated_at") or record.get("created_at") or ""
+                events.append((str(stamp), dataset["project"]["name"], dataset["table"]["name"], record["id"]))
+        events.sort(key=lambda item: item[0], reverse=True)
+        if events:
+            for stamp, project_name, table_name, record_id in events[:5]:
+                line = QHBoxLayout()
+                label = QLabel(f"Registro #{record_id} • {table_name} / {project_name}")
+                label.setStyleSheet("color:#46586b;")
+                date_label = QLabel(stamp or "Data indisponível")
+                date_label.setObjectName("mutedSmall")
+                line.addWidget(label, 1)
+                line.addWidget(date_label)
+                activity.body.addLayout(line)
+        else:
+            empty = QLabel("Nenhum registro importado neste workspace.")
+            empty.setObjectName("muted")
+            activity.body.addWidget(empty)
         middle.addWidget(activity, 3)
 
-        pending = Panel("Pendências de validação", "Priorize inconsistências antes de comparar")
-        for label, detail in [
-            ("Unidades não identificadas", "Não apurado"),
-            ("Campos geométricos ausentes", "Não apurado"),
-            ("Quantitativos duplicados", "Não apurado"),
-            ("Origem não informada", "Não apurado"),
+        pending_panel = Panel("Pendências de validação", "Contagens derivadas dos campos presentes na tabela")
+        duplicate_count = (
+            sum(item["duplicate_quantities"] or 0 for item in qualities)
+            if any(item["duplicate_quantities"] is not None for item in qualities) else None
+        )
+        geometry_count = (
+            sum(item["missing_geometry"] or 0 for item in qualities)
+            if any(item["missing_geometry"] is not None for item in qualities) else None
+        )
+        for label, count in [
+            ("Unidades não identificadas", None),
+            ("Campos geométricos ausentes", geometry_count),
+            ("Quantitativos duplicados", duplicate_count),
+            ("Origem não informada", sum(item["missing_origin"] for item in qualities)),
         ]:
             line = QHBoxLayout()
-            item = QLabel("•  " + label)
-            item.setStyleSheet("color:#46586b;")
-            value = QLabel(detail)
+            item_label = QLabel("•  " + label)
+            item_label.setStyleSheet("color:#46586b;")
+            value = QLabel("Não apurado" if count is None else f"{count} registros")
             value.setObjectName("muted")
-            line.addWidget(item)
-            line.addStretch()
+            line.addWidget(item_label, 1)
             line.addWidget(value)
-            pending.body.addLayout(line)
-        middle.addWidget(pending, 2)
+            pending_panel.body.addLayout(line)
+        middle.addWidget(pending_panel, 2)
         layout.addLayout(middle, 1)
 
         quick = Panel("Acesso rápido")
@@ -349,7 +467,11 @@ class PonteMainWindow(QMainWindow):
             shortcuts.addWidget(card, 1)
         quick.body.addLayout(shortcuts)
         layout.addWidget(quick)
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
         return page
+
+
 
     def _projects_page(self) -> QWidget:
         page = QWidget()
