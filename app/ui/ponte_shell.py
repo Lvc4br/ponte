@@ -1044,17 +1044,25 @@ class PonteMainWindow(QMainWindow):
         return "\n".join(lines) or "Nenhuma linha encontrada na prévia."
 
     def _analysis_page(self) -> QWidget:
-        """Interactive analysis over imported workspace tables; no unapproved indicators are calculated."""
+        """Scrollable analysis layout following the approved filter/results composition."""
         page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 10, 8)
         layout.setSpacing(12)
 
         heading = QLabel("Análise de dados de pontes e OAEs")
+        heading.setMinimumHeight(34)
         heading.setStyleSheet("font-size:14pt;font-weight:700;color:#26384b;")
         subtitle = QLabel(
-            "Selecione um projeto e uma tabela importada. Os filtros consultam os valores "
-            "armazenados no workspace; indicadores técnicos aguardam validação metodológica."
+            "Defina intervalos, combine critérios e examine os registros importados. "
+            "Indicadores técnicos aguardam validação metodológica."
         )
         subtitle.setObjectName("sectionIntro")
         subtitle.setWordWrap(True)
@@ -1074,98 +1082,95 @@ class PonteMainWindow(QMainWindow):
         scope.body.addLayout(selectors)
         layout.addWidget(scope)
 
-        # Filtros em largura total evitam comprimir os controles em telas menores.
-        body = QVBoxLayout()
-        body.setSpacing(12)
-        filters = Panel("Filtros por intervalo", "Escolha uma coluna numérica real da tabela e informe limites opcionais")
-        filters.body.setSpacing(12)
+        body = QHBoxLayout()
+        body.setSpacing(14)
+        filters = Panel(
+            "Filtros por intervalo",
+            "Escolha uma coluna numérica e informe limites opcionais."
+        )
+        filters.setMinimumWidth(320)
+        filters.setMaximumWidth(390)
+        filters.body.setSpacing(10)
         self.analysis_filter_rows = []
         grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(9)
+        grid.setHorizontalSpacing(8)
+        grid.setVerticalSpacing(8)
         for col, title in enumerate(("Campo numérico", "Mínimo", "Máximo")):
             label = QLabel(title)
-            label.setMinimumHeight(26)
+            label.setMinimumHeight(24)
+            label.setWordWrap(True)
             grid.addWidget(label, 0, col)
         grid.setColumnStretch(0, 2)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(2, 1)
         for index in range(4):
             field = QComboBox()
-            field.setMinimumWidth(180)
-            field.setMinimumHeight(38)
+            field.setMinimumWidth(0)
+            field.setMinimumHeight(36)
             minimum = QLineEdit()
-            minimum.setPlaceholderText("Sem mínimo")
-            minimum.setMinimumHeight(38)
+            minimum.setPlaceholderText("Mín.")
+            minimum.setMinimumWidth(0)
+            minimum.setMinimumHeight(36)
             maximum = QLineEdit()
-            maximum.setPlaceholderText("Sem máximo")
-            maximum.setMinimumHeight(38)
+            maximum.setPlaceholderText("Máx.")
+            maximum.setMinimumWidth(0)
+            maximum.setMinimumHeight(36)
             grid.addWidget(field, index + 1, 0)
             grid.addWidget(minimum, index + 1, 1)
             grid.addWidget(maximum, index + 1, 2)
-            grid.setRowMinimumHeight(index + 1, 44)
+            grid.setRowMinimumHeight(index + 1, 42)
             self.analysis_filter_rows.append((field, minimum, maximum))
         filters.body.addLayout(grid)
-        search_row = QHBoxLayout()
-        search_row.setSpacing(10)
+
         self.analysis_search = QLineEdit()
         self.analysis_search.setPlaceholderText("Pesquisar em todos os campos…")
-        self.analysis_search.setMinimumHeight(40)
-        search_row.addWidget(self.analysis_search, 1)
+        self.analysis_search.setMinimumHeight(38)
+        filters.body.addWidget(self.analysis_search)
+        buttons = QHBoxLayout()
+        buttons.setSpacing(8)
         apply_button = QPushButton("Aplicar filtros")
         apply_button.setObjectName("primaryAction")
         apply_button.setMinimumHeight(40)
         apply_button.clicked.connect(self._apply_analysis_filters)
-        search_row.addWidget(apply_button)
         clear_button = QPushButton("Limpar")
         clear_button.setObjectName("secondaryAction")
         clear_button.setMinimumHeight(40)
         clear_button.clicked.connect(self._clear_analysis_filters)
-        search_row.addWidget(clear_button)
-        filters.body.addLayout(search_row)
+        buttons.addWidget(apply_button, 1)
+        buttons.addWidget(clear_button)
+        filters.body.addLayout(buttons)
         self.analysis_count = QLabel("Selecione um conjunto para consultar os registros.")
         self.analysis_count.setObjectName("mutedSmall")
-        self.analysis_count.setMinimumHeight(22)
+        self.analysis_count.setMinimumHeight(34)
         self.analysis_count.setWordWrap(True)
         filters.body.addWidget(self.analysis_count)
-        body.addWidget(filters)
+        filters.body.addStretch(1)
+        body.addWidget(filters, 0)
 
-        results = Panel("Resultados da seleção", "Use a barra horizontal para percorrer todas as colunas do conjunto")
-        self.analysis_table = QTableWidget(0, 0)
-        self.analysis_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.analysis_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.analysis_table.setAlternatingRowColors(True)
-        self.analysis_table.setWordWrap(False)
-        self.analysis_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.analysis_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.analysis_table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-        self.analysis_table.verticalHeader().setVisible(False)
-        self.analysis_table.verticalHeader().setDefaultSectionSize(34)
-        header = self.analysis_table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        header.setDefaultSectionSize(150)
-        header.setMinimumSectionSize(120)
-        header.setStretchLastSection(False)
-        self.analysis_table.setMinimumHeight(320)
-        results.body.addWidget(self.analysis_table, 1)
-        body.addWidget(results, 1)
-        layout.addLayout(body, 1)
-
-        indicators = Panel("Indicadores de engenharia", "Não calculados até aprovação das fórmulas, unidades e regras de comparabilidade pela EGT")
+        right = QVBoxLayout()
+        right.setSpacing(12)
+        indicators = Panel(
+            "Indicadores de engenharia",
+            "Não calculados até aprovação das fórmulas, unidades e regras de comparabilidade pela EGT."
+        )
         metric_grid = QGridLayout()
+        metric_grid.setHorizontalSpacing(10)
+        metric_grid.setVerticalSpacing(8)
         for index, (name, unit) in enumerate([
             ("Paf", "kg/m²"), ("Pap", "kg/m²"), ("Ecm", "unidade a validar"),
             ("Af", "m²/m²"), ("Aço total indicativo", "kg/m²"),
             ("Aço total indicativo", "kg/m³"),
         ]):
             card = QFrame()
+            card.setMinimumHeight(78)
             card.setStyleSheet("QFrame {background:#f4f7fa;border:1px solid #e1e7ed;border-radius:6px;}")
             box = QVBoxLayout(card)
-            box.setContentsMargins(10, 8, 10, 8)
+            box.setContentsMargins(9, 7, 9, 7)
             label = QLabel(name)
             label.setObjectName("mutedSmall")
+            label.setWordWrap(True)
             value = QLabel("Não calculado")
-            value.setStyleSheet("font-size:13pt;font-weight:700;color:#294b67;")
+            value.setStyleSheet("font-size:12pt;font-weight:700;color:#294b67;")
             unit_label = QLabel(unit)
             unit_label.setObjectName("mutedSmall")
             box.addWidget(label)
@@ -1173,12 +1178,40 @@ class PonteMainWindow(QMainWindow):
             box.addWidget(unit_label)
             metric_grid.addWidget(card, index // 3, index % 3)
         indicators.body.addLayout(metric_grid)
-        layout.addWidget(indicators)
+        right.addWidget(indicators)
+
+        results = Panel(
+            "Resultados da seleção",
+            "Linhas da tabela importada • use as barras para percorrer colunas e registros."
+        )
+        self.analysis_results_count = QLabel("Nenhum conjunto selecionado.")
+        self.analysis_results_count.setObjectName("mutedSmall")
+        results.body.addWidget(self.analysis_results_count)
+        self.analysis_table = QTableWidget(0, 0)
+        self.analysis_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.analysis_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.analysis_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.analysis_table.setAlternatingRowColors(True)
+        self.analysis_table.setWordWrap(False)
+        self.analysis_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.analysis_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.analysis_table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.analysis_table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.analysis_table.verticalHeader().setVisible(False)
+        self.analysis_table.verticalHeader().setDefaultSectionSize(34)
+        self.analysis_table.horizontalHeader().setDefaultSectionSize(145)
+        self.analysis_table.horizontalHeader().setMinimumSectionSize(105)
+        self.analysis_table.horizontalHeader().setStretchLastSection(False)
+        self.analysis_table.setMinimumHeight(350)
+        results.body.addWidget(self.analysis_table, 1)
+        right.addWidget(results, 1)
+        body.addLayout(right, 1)
+        layout.addLayout(body, 1)
 
         note = QLabel(
-            "Integridade metodológica: os filtros acima operam sobre os dados importados, "
-            "sem alterar a origem. Paf, Pap, Ecm, Af e aço permanecem sem cálculo até que "
-            "definições, unidades e fórmulas sejam formalmente validadas."
+            "Integridade metodológica: os filtros consultam os valores armazenados sem alterar a origem. "
+            "Paf, Pap, Ecm, Af e aço permanecem sem cálculo até validação formal de definições, "
+            "unidades e fórmulas."
         )
         note.setWordWrap(True)
         note.setStyleSheet("background:#fff5e5;color:#93621f;padding:10px;border-radius:6px;")
@@ -1188,6 +1221,8 @@ class PonteMainWindow(QMainWindow):
         self.analysis_dataset.currentIndexChanged.connect(self._analysis_dataset_changed)
         self.analysis_search.textChanged.connect(self._apply_analysis_filters)
         self._refresh_analysis_tables()
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
         return page
 
     def _refresh_analysis_tables(self, *_):
@@ -1199,9 +1234,7 @@ class PonteMainWindow(QMainWindow):
         if project_id is not None:
             for table in self.store.list_tables(project_id):
                 count = len(self.store.list_records(table["id"]))
-                self.analysis_dataset.addItem(
-                    f'{table["name"]}  ·  {count} registros', table["id"]
-                )
+                self.analysis_dataset.addItem(f'{table["name"]} · {count} registros', table["id"])
         self.analysis_dataset.blockSignals(False)
         self._analysis_dataset_changed()
 
@@ -1215,7 +1248,9 @@ class PonteMainWindow(QMainWindow):
             field.addItem("Selecionar campo", None)
         if table_id is None:
             self.analysis_columns = []
+            self.analysis_records = []
             self.analysis_count.setText("Este projeto ainda não possui tabelas importadas.")
+            self.analysis_results_count.setText("Nenhum conjunto selecionado.")
             self.analysis_table.clear()
             self.analysis_table.setRowCount(0)
             self.analysis_table.setColumnCount(0)
@@ -1224,19 +1259,27 @@ class PonteMainWindow(QMainWindow):
                 minimum.clear()
                 maximum.clear()
             return
+
         self.analysis_columns = self.store.list_columns(table_id)
-        numeric = [c for c in self.analysis_columns if c.get("data_type") in ("integer", "decimal")]
-        preferred = ("compr_obra_m", "comprimento_total_m", "comprimento_m",
-                     "largura_m", "area_tabuleiro_m2", "volume_concreto_estimado_m3",
-                     "volume_concreto_m3")
-        for field, minimum, maximum in self.analysis_filter_rows:
+        self.analysis_records = self.store.list_records(table_id)
+        unit_tokens = ("_m", "m²", "m2", "m³", "m3", "_kg", "kg_", "mm", "cm")
+        excluded = {"obra", "data", "id", "identificador", "seção", "secao"}
+        numeric = [
+            column for column in self.analysis_columns
+            if column.get("data_type") in ("integer", "decimal")
+            or (
+                column["name"].casefold() not in excluded
+                and any(token in column["name"].casefold() for token in unit_tokens)
+            )
+        ]
+        preferred = ("compr_obra_m", "largura_m", "vão_m", "vao_m", "hviga_laje_m", "em_m3_m2")
+        for row_index, (field, minimum, maximum) in enumerate(self.analysis_filter_rows):
             for column in numeric:
                 field.addItem(column["name"], column["name"])
-            for name in preferred:
-                index = field.findData(name)
+            if row_index < len(preferred):
+                index = field.findData(preferred[row_index])
                 if index > 0:
                     field.setCurrentIndex(index)
-                    break
             field.blockSignals(False)
             minimum.clear()
             maximum.clear()
@@ -1244,12 +1287,15 @@ class PonteMainWindow(QMainWindow):
 
     @staticmethod
     def _analysis_number(value):
-        if value is None or str(value).strip() == "":
-            return None
-        if isinstance(value, bool):
+        if value is None or isinstance(value, bool) or str(value).strip() == "":
             return None
         try:
-            return float(str(value).strip().replace(",", "."))
+            raw = str(value).strip().replace(" ", "")
+            if "," in raw and "." in raw:
+                raw = raw.replace(".", "").replace(",", ".")
+            else:
+                raw = raw.replace(",", ".")
+            return float(raw)
         except (TypeError, ValueError):
             return None
 
@@ -1267,8 +1313,6 @@ class PonteMainWindow(QMainWindow):
         table_id = self.analysis_dataset.currentData()
         if table_id is None:
             return
-        columns = self.store.list_columns(table_id)
-        records = self.store.list_records(table_id)
         active_ranges = []
         for field, minimum, maximum in self.analysis_filter_rows:
             name = field.currentData()
@@ -1277,28 +1321,38 @@ class PonteMainWindow(QMainWindow):
                 continue
             low = self._analysis_number(low_text) if low_text else None
             high = self._analysis_number(high_text) if high_text else None
-            if low_text and low is None or high_text and high is None:
-                self.analysis_count.setText("Use limites numéricos válidos. Exemplo: 12,5.")
+            if (low_text and low is None) or (high_text and high is None):
+                message = "Use limites numéricos válidos. Exemplo: 12,5."
+                self.analysis_count.setText(message)
+                self.analysis_results_count.setText(message)
                 return
             if low is not None and high is not None and low > high:
-                self.analysis_count.setText(f"O mínimo de '{name}' não pode ser maior que o máximo.")
+                message = f"O mínimo de '{name}' não pode ser maior que o máximo."
+                self.analysis_count.setText(message)
+                self.analysis_results_count.setText(message)
                 return
             active_ranges.append((name, low, high))
+
         needle = self.analysis_search.text().strip().casefold()
         selected = []
+        records = self.analysis_records
         for record in records:
             values = record["values"]
             keep = True
             for name, low, high in active_ranges:
                 number = self._analysis_number(values.get(name))
-                if number is None or low is not None and number < low or high is not None and number > high:
+                if number is None or (low is not None and number < low) or (high is not None and number > high):
                     keep = False
                     break
             if keep and needle:
-                keep = needle in " ".join(str(v) for v in values.values() if v is not None).casefold()
+                keep = needle in " ".join(
+                    str(value) for value in values.values() if value is not None
+                ).casefold()
             if keep:
                 selected.append(record)
-        headers = [column["name"] for column in columns]
+
+        headers = [column["name"] for column in self.analysis_columns]
+        self.analysis_table.setUpdatesEnabled(False)
         self.analysis_table.clear()
         self.analysis_table.setColumnCount(len(headers))
         self.analysis_table.setHorizontalHeaderLabels(headers)
@@ -1306,20 +1360,23 @@ class PonteMainWindow(QMainWindow):
         for row, record in enumerate(selected):
             for col, name in enumerate(headers):
                 value = record["values"].get(name)
-                rendered = "—" if value is None else str(value)
-                self.analysis_table.setItem(row, col, QTableWidgetItem(rendered))
-        self.analysis_table.resizeColumnsToContents()
+                self.analysis_table.setItem(
+                    row, col, QTableWidgetItem("—" if value is None else str(value))
+                )
         header = self.analysis_table.horizontalHeader()
         for col in range(len(headers)):
-            self.analysis_table.setColumnWidth(
-                col, max(120, min(self.analysis_table.columnWidth(col), 280))
-            )
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
-        self.analysis_count.setText(
+            self.analysis_table.setColumnWidth(col, 145)
+        self.analysis_table.setUpdatesEnabled(True)
+        message = (
             f"{len(selected)} de {len(records)} registros exibidos"
             + (f" · {len(active_ranges)} intervalo(s) ativo(s)" if active_ranges else "")
             + (" · pesquisa textual ativa" if needle else "")
         )
+        self.analysis_count.setText(message)
+        self.analysis_results_count.setText(message)
+
+
 
     def _reports_page(self) -> QWidget:
         """Report catalog layout; generation stays disabled until validated data exists."""
