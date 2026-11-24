@@ -241,7 +241,10 @@ class DocumentScanner:
             root = Path(sys.executable).resolve().parent
         else:
             root = Path(__file__).resolve().parents[2]
+        bundle_root = Path(getattr(sys, "_MEIPASS", root))
         candidates = [
+            bundle_root / "Tesseract-OCR" / "tesseract.exe",
+            bundle_root / "Tesseract-OCR" / "tesseract",
             root / "Tesseract-OCR" / "tesseract.exe",
             root / "Tesseract-OCR" / "tesseract",
             root / "_internal" / "Tesseract-OCR" / "tesseract.exe",
