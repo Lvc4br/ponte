@@ -7,7 +7,7 @@ from app.ui.ponte_shell import PonteMainWindow
 
 def main() -> int:
     app = QApplication(sys.argv)
-    app.setApplicationName("PONTE")
+    app.setApplicationName("EGT")
     app.setOrganizationName("EGT Engenharia")
     window = PonteMainWindow()
     window.show()
