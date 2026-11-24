@@ -22,6 +22,11 @@ from PySide6.QtWidgets import (
 from app.documents.index import DocumentIndex
 from app.documents.scanner import DocumentScanner
 from app.workspace.store import WorkspaceStore
+from app.workspace.analysis import (
+    calculate_indicator_metrics,
+    filter_analysis_records,
+    parse_analysis_number,
+)
 from app.workspace.exchange import SpreadsheetExchange
 from app.data.dataset_store import DEFAULT_STORE, DatasetStore
 from app.core.bridge_formatters import bridge_span_text
@@ -1454,6 +1459,9 @@ class PonteMainWindow(QMainWindow):
             "Resultados da seleção",
             "Linhas da tabela importada • use as barras para percorrer colunas e registros."
         )
+        self.analysis_total_label = QLabel("Total de obras selecionadas: 0")
+        self.analysis_total_label.setStyleSheet("font-size:12pt;font-weight:700;color:#294b67;padding:3px 0;")
+        results.body.addWidget(self.analysis_total_label)
         self.analysis_results_count = QLabel("Nenhum conjunto selecionado.")
         self.analysis_results_count.setObjectName("mutedSmall")
         results.body.addWidget(self.analysis_results_count)
@@ -1562,17 +1570,7 @@ class PonteMainWindow(QMainWindow):
 
     @staticmethod
     def _analysis_number(value):
-        if value is None or isinstance(value, bool) or str(value).strip() == "":
-            return None
-        try:
-            raw = str(value).strip().replace(" ", "")
-            if "," in raw and "." in raw:
-                raw = raw.replace(".", "").replace(",", ".")
-            else:
-                raw = raw.replace(",", ".")
-            return float(raw)
-        except (TypeError, ValueError):
-            return None
+        return parse_analysis_number(value)
 
     def _clear_analysis_filters(self):
         for field, minimum, maximum in self.analysis_filter_rows:
@@ -1608,30 +1606,16 @@ class PonteMainWindow(QMainWindow):
                 return
             active_ranges.append((name, low, high))
 
-        needle = self.analysis_search.text().strip().casefold()
-        selected = []
+        needle = self.analysis_search.text().strip()
         records = self.analysis_records
-        for record in records:
-            values = record["values"]
-            keep = True
-            for name, low, high in active_ranges:
-                number = self._analysis_number(values.get(name))
-                if number is None or (low is not None and number < low) or (high is not None and number > high):
-                    keep = False
-                    break
-            if keep and needle:
-                keep = needle in " ".join(
-                    str(value) for value in values.values() if value is not None
-                ).casefold()
-            if keep:
-                selected.append(record)
-
         selected_type = self.analysis_work_type_filter.currentData()
-        if selected_type:
-            selected = [
-                record for record in selected
-                if self.analysis_work_types.get(record["id"]) == selected_type
-            ]
+        selected = filter_analysis_records(
+            records,
+            ranges=active_ranges,
+            search=needle,
+            work_types=self.analysis_work_types,
+            selected_type=selected_type,
+        )
 
         headers = [column["name"] for column in self.analysis_columns] + ["Tipo de obra"]
         self.analysis_filtered_records = selected
@@ -1662,6 +1646,7 @@ class PonteMainWindow(QMainWindow):
             + (" · pesquisa textual ativa" if needle else "")
         )
         self.analysis_count.setText(message)
+        self.analysis_total_label.setText(f"Total de obras selecionadas: {len(selected)}")
         self.analysis_results_count.setText(message)
         # A média usa exatamente o recorte exibido. Sem tipo selecionado, considera todos os tipos;
         # filtros numéricos isolados (inclusive somente máximo) também geram médias.
@@ -1713,16 +1698,19 @@ class PonteMainWindow(QMainWindow):
         if not hasattr(self, "analysis_indicator_cards"):
             return
         records = records or []
+        definitions = [
+            (field_name, field_name, decimals)
+            for _value_label, field_name, decimals, _count_label in self.analysis_indicator_cards
+        ]
+        metrics = calculate_indicator_metrics(records, definitions)
         for value_label, field_name, decimals, count_label in self.analysis_indicator_cards:
-            valid = [
-                number for record in records
-                if (number := self._analysis_number(record["values"].get(field_name))) is not None
-            ]
-            missing = len(records) - len(valid)
-            if valid:
-                mean = sum(valid) / len(valid)
+            metric = metrics[field_name]
+            mean = metric["mean"]
+            valid = metric["valid"]
+            missing = metric["missing"]
+            if mean is not None:
                 display = f"{mean:,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                count_text = f"N = {len(valid)} OAEs · {missing} ausente(s)"
+                count_text = f"N = {valid} OAEs · {missing} ausente(s)"
             elif records:
                 display = "Sem dados válidos"
                 count_text = f"N = 0 · {missing} ausente(s)"
