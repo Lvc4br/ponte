@@ -12,8 +12,8 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QAbstractItemView, QDialog, QDialogButtonBox, QFrame, QGridLayout,
-    QHBoxLayout, QInputDialog, QLabel, QMainWindow, QMessageBox,
+    QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QInputDialog,
+    QLabel, QMainWindow, QMessageBox,
     QPushButton, QStackedWidget, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QWidget, QScrollArea, QComboBox, QLineEdit,
     QFileDialog, QTabWidget,
@@ -685,9 +685,64 @@ class PonteMainWindow(QMainWindow):
         management_row.addStretch(1)
         manage_tables = QPushButton("Gerenciar tabelas existentes")
         manage_tables.setObjectName("secondaryAction")
-        manage_tables.clicked.connect(self.manage_tables)
+        manage_tables.setCheckable(True)
+        manage_tables.toggled.connect(self._toggle_table_manager)
         management_row.addWidget(manage_tables)
         layout.addLayout(management_row)
+
+        self.table_manager_panel = QFrame()
+        self.table_manager_panel.setObjectName("tableManagerPanel")
+        self.table_manager_panel.setStyleSheet(
+            "QFrame#tableManagerPanel {background:#ffffff;border:1px solid #dce5ed;border-radius:8px;}"
+        )
+        manager_layout = QVBoxLayout(self.table_manager_panel)
+        manager_layout.setContentsMargins(14, 12, 14, 12)
+        manager_layout.setSpacing(9)
+        manager_heading = QLabel("Gerenciamento de tabelas")
+        manager_heading.setStyleSheet("font-size:12pt;font-weight:700;color:#26384b;border:0;")
+        manager_layout.addWidget(manager_heading)
+        manager_intro = QLabel(
+            "Gerencie as tabelas deste projeto sem sair da tela de importação."
+        )
+        manager_intro.setObjectName("muted")
+        manager_intro.setStyleSheet("border:0;")
+        manager_layout.addWidget(manager_intro)
+        manager_project_row = QHBoxLayout()
+        manager_project_row.addWidget(QLabel("Projeto"))
+        self.manager_project_combo = QComboBox()
+        for project in self.store.list_projects():
+            self.manager_project_combo.addItem(project["name"], project["id"])
+        self.manager_project_combo.currentIndexChanged.connect(self._refresh_table_manager)
+        manager_project_row.addWidget(self.manager_project_combo, 1)
+        manager_layout.addLayout(manager_project_row)
+        self.manager_tables_grid = QTableWidget(0, 3)
+        self.manager_tables_grid.setHorizontalHeaderLabels(
+            ["Nome da tabela", "Registros", "Última atualização"]
+        )
+        self.manager_tables_grid.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.manager_tables_grid.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.manager_tables_grid.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.manager_tables_grid.verticalHeader().setVisible(False)
+        self.manager_tables_grid.horizontalHeader().setStretchLastSection(True)
+        self.manager_tables_grid.setAlternatingRowColors(True)
+        self.manager_tables_grid.setMinimumHeight(150)
+        self.manager_tables_grid.setMaximumHeight(230)
+        manager_layout.addWidget(self.manager_tables_grid)
+        manager_actions = QHBoxLayout()
+        rename_managed = QPushButton("Renomear selecionada")
+        rename_managed.clicked.connect(self._rename_managed_table)
+        delete_managed = QPushButton("Excluir selecionada")
+        delete_managed.setStyleSheet(
+            "QPushButton {color:#a12d2d;border:1px solid #d8a4a4;padding:7px 12px;}"
+            "QPushButton:hover {background:#fff0f0;}"
+        )
+        delete_managed.clicked.connect(self._delete_managed_table)
+        manager_actions.addWidget(rename_managed)
+        manager_actions.addWidget(delete_managed)
+        manager_actions.addStretch(1)
+        manager_layout.addLayout(manager_actions)
+        self.table_manager_panel.hide()
+        layout.addWidget(self.table_manager_panel)
 
         # Large, uncluttered drop zone as shown in the approved import screen.
         drop_area = FileDropFrame(self.select_import_file)
@@ -1398,131 +1453,81 @@ class PonteMainWindow(QMainWindow):
         layout.addStretch(1)
         return page
 
-    def manage_tables(self):
-        """Manage imported tables inside the current PONTE interface."""
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Gerenciar tabelas")
-        dialog.setMinimumSize(720, 470)
-        dialog.setModal(True)
+    def _toggle_table_manager(self, visible: bool):
+        self.table_manager_panel.setVisible(visible)
+        if visible:
+            self._refresh_table_manager()
 
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(22, 20, 22, 18)
-        layout.setSpacing(12)
+    def _refresh_table_manager(self, *args):
+        grid = getattr(self, "manager_tables_grid", None)
+        project_combo = getattr(self, "manager_project_combo", None)
+        if grid is None or project_combo is None:
+            return
+        grid.setRowCount(0)
+        project_id = project_combo.currentData()
+        if project_id is None:
+            return
+        for item in self.store.list_tables(project_id):
+            row = grid.rowCount()
+            grid.insertRow(row)
+            name_item = QTableWidgetItem(item["name"])
+            name_item.setData(Qt.ItemDataRole.UserRole, item["id"])
+            grid.setItem(row, 0, name_item)
+            grid.setItem(row, 1, QTableWidgetItem(
+                str(len(self.store.list_records(item["id"])))
+            ))
+            grid.setItem(row, 2, QTableWidgetItem(
+                str(item.get("updated_at") or "—")
+            ))
+        grid.resizeColumnsToContents()
 
-        title = QLabel("Tabelas do projeto")
-        title.setStyleSheet("font-size:16pt;font-weight:700;color:#26384b;")
-        description = QLabel(
-            "Consulte, renomeie ou exclua tabelas importadas. "
-            "A exclusão remove também os registros e as colunas daquela tabela."
+    def _selected_managed_table(self):
+        grid = getattr(self, "manager_tables_grid", None)
+        if grid is None:
+            return None, None
+        row = grid.currentRow()
+        item = grid.item(row, 0) if row >= 0 else None
+        if item is None:
+            return None, None
+        return item.data(Qt.ItemDataRole.UserRole), item.text()
+
+    def _rename_managed_table(self):
+        table_id, current_name = self._selected_managed_table()
+        if table_id is None:
+            QMessageBox.information(self, "Renomear tabela", "Selecione uma tabela.")
+            return
+        new_name, accepted = QInputDialog.getText(
+            self, "Renomear tabela", "Novo nome:", text=current_name
         )
-        description.setWordWrap(True)
-        description.setObjectName("muted")
-        layout.addWidget(title)
-        layout.addWidget(description)
+        if not accepted or not new_name.strip() or new_name.strip() == current_name:
+            return
+        try:
+            self.store.update_table(table_id, name=new_name.strip())
+        except Exception as exc:
+            QMessageBox.warning(self, "Não foi possível renomear", str(exc))
+            return
+        self._refresh_table_manager()
+        self.refresh_pages()
 
-        project_row = QHBoxLayout()
-        project_row.addWidget(QLabel("Projeto"))
-        project_combo = QComboBox()
-        projects = self.store.list_projects()
-        for project in projects:
-            project_combo.addItem(project["name"], project["id"])
-        project_row.addWidget(project_combo, 1)
-        layout.addLayout(project_row)
-
-        table = QTableWidget(0, 3)
-        table.setHorizontalHeaderLabels(["Nome da tabela", "Registros", "Atualizada em"])
-        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        table.verticalHeader().setVisible(False)
-        table.horizontalHeader().setStretchLastSection(True)
-        table.setAlternatingRowColors(True)
-        layout.addWidget(table, 1)
-
-        actions = QHBoxLayout()
-        rename_button = QPushButton("Renomear")
-        delete_button = QPushButton("Excluir tabela")
-        delete_button.setStyleSheet(
-            "QPushButton {color:#a12d2d;border:1px solid #d8a4a4;padding:8px 14px;}"
-            "QPushButton:hover {background:#fff0f0;}"
+    def _delete_managed_table(self):
+        table_id, current_name = self._selected_managed_table()
+        if table_id is None:
+            QMessageBox.information(self, "Excluir tabela", "Selecione uma tabela.")
+            return
+        count = len(self.store.list_records(table_id))
+        answer = QMessageBox.question(
+            self,
+            "Confirmar exclusão",
+            f"Excluir a tabela '{current_name}' e seus {count} registro(s)?\\n\\n"
+            "Esta ação também remove as colunas e não pode ser desfeita.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        actions.addWidget(rename_button)
-        actions.addWidget(delete_button)
-        actions.addStretch(1)
-        close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        close_buttons.rejected.connect(dialog.reject)
-        actions.addWidget(close_buttons)
-        layout.addLayout(actions)
-
-        def refresh_table_list():
-            table.setRowCount(0)
-            project_id = project_combo.currentData()
-            if project_id is None:
-                return
-            for item in self.store.list_tables(project_id):
-                row = table.rowCount()
-                table.insertRow(row)
-                name_item = QTableWidgetItem(item["name"])
-                name_item.setData(Qt.ItemDataRole.UserRole, item["id"])
-                table.setItem(row, 0, name_item)
-                table.setItem(row, 1, QTableWidgetItem(
-                    str(len(self.store.list_records(item["id"])))
-                ))
-                table.setItem(row, 2, QTableWidgetItem(
-                    str(item.get("updated_at") or "—")
-                ))
-            table.resizeColumnsToContents()
-
-        def selected_table_id():
-            row = table.currentRow()
-            item = table.item(row, 0) if row >= 0 else None
-            return item.data(Qt.ItemDataRole.UserRole) if item else None
-
-        def rename_selected():
-            table_id = selected_table_id()
-            if table_id is None:
-                QMessageBox.information(dialog, "Renomear tabela", "Selecione uma tabela.")
-                return
-            current_name = table.item(table.currentRow(), 0).text()
-            new_name, accepted = QInputDialog.getText(
-                dialog, "Renomear tabela", "Novo nome:", text=current_name
-            )
-            if not accepted or not new_name.strip() or new_name.strip() == current_name:
-                return
-            try:
-                self.store.update_table(table_id, name=new_name.strip())
-            except Exception as exc:
-                QMessageBox.warning(dialog, "Não foi possível renomear", str(exc))
-                return
-            refresh_table_list()
-            self.refresh_pages()
-
-        def delete_selected():
-            table_id = selected_table_id()
-            if table_id is None:
-                QMessageBox.information(dialog, "Excluir tabela", "Selecione uma tabela.")
-                return
-            current_name = table.item(table.currentRow(), 0).text()
-            count = len(self.store.list_records(table_id))
-            answer = QMessageBox.question(
-                dialog,
-                "Confirmar exclusão",
-                f"Excluir a tabela '{current_name}' e seus {count} registro(s)?\n\n"
-                "Esta ação não pode ser desfeita.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if answer != QMessageBox.StandardButton.Yes:
-                return
-            self.store.delete_table(table_id)
-            refresh_table_list()
-            self.refresh_pages()
-
-        project_combo.currentIndexChanged.connect(refresh_table_list)
-        rename_button.clicked.connect(rename_selected)
-        delete_button.clicked.connect(delete_selected)
-        refresh_table_list()
-        dialog.exec()
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.store.delete_table(table_id)
+        self._refresh_table_manager()
+        self.refresh_pages()
 
     def refresh_pages(self):
         current = self.stack.currentIndex()
