@@ -302,3 +302,54 @@ def test_xlsx_preview_lists_sheet_samples(tmp_path):
     preview = SpreadsheetExchange(store).preview_xlsx(source, limit=1)
     assert preview["sheets"][0]["sheet_name"] == "Resumo"
     assert preview["sheets"][0]["rows"] == [["A", "B"], [1, 2]]
+
+def test_oae_work_type_classification_is_persistent_and_does_not_change_source_values(tmp_path):
+    store, project = build_store(tmp_path)
+    table = store.create_table(project, "OAEs")
+    store.add_column(table, "obra", "text")
+    store.add_column(table, "Paf_kg_m2", "decimal")
+    record = store.insert_record(table, {"obra": "OAE 01", "Paf_kg_m2": 80.5})
+
+    assert store.set_record_work_type(record, "Viga biapoiada")
+    assert store.list_record_work_types(table) == {record: "Viga biapoiada"}
+    assert store.list_records(table)[0]["values"] == {
+        "obra": "OAE 01",
+        "Paf_kg_m2": 80.5,
+    }
+
+    reopened = WorkspaceStore(store.path)
+    assert reopened.list_record_work_types(table) == {record: "Viga biapoiada"}
+    assert reopened.set_record_work_type(record, "Laje")
+    assert reopened.list_record_work_types(table) == {record: "Laje"}
+    assert reopened.set_record_work_type(record, None)
+    assert reopened.list_record_work_types(table) == {}
+
+
+def test_oae_work_type_classification_rejects_unknown_type_and_cascades_on_delete(tmp_path):
+    store, project = build_store(tmp_path)
+    table = store.create_table(project, "OAEs")
+    store.add_column(table, "obra", "text")
+    record = store.insert_record(table, {"obra": "OAE 02"})
+
+    with pytest.raises(ValueError, match="Tipo de obra"):
+        store.set_record_work_type(record, "Ponte inventada")
+    assert store.set_record_work_type(record, "Estaiada")
+    assert store.delete_record(record)
+    assert store.list_record_work_types(table) == {}
+
+
+def test_workspace_schema_v2_migrates_additively_to_v3(tmp_path):
+    import sqlite3
+    path = tmp_path / "migration_v2.sqlite3"
+    store, project = build_store(tmp_path)
+    table = store.create_table(project, "Tabela")
+    store.add_column(table, "Valor")
+    record = store.insert_record(table, {"Valor": "preservado"})
+    with sqlite3.connect(path) as db:
+        db.execute("UPDATE ponte_schema_version SET version=2 WHERE component='workspace'")
+        db.execute("DROP TABLE workspace_record_classifications")
+
+    migrated = WorkspaceStore(path)
+    assert migrated.list_records(table)[0]["values"] == {"Valor": "preservado"}
+    assert migrated.list_record_work_types(table) == {}
+
