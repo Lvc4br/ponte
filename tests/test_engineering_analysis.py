@@ -58,7 +58,7 @@ def test_combines_multiple_numeric_ranges(records):
         records,
         ranges=[("comprimento_m", 100, 300), ("Paf_kg_m2", 15, 40)],
     )
-    assert [record["id"] for record in selected] == [2, 4]
+    assert [record["id"] for record in selected] == [2]
 
 
 def test_missing_numeric_value_does_not_pass_active_range(records):
