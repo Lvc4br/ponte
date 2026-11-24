@@ -36,7 +36,7 @@ O executável tem aproximadamente 109 MB. Ele ultrapassa o limite de 100 MiB par
 
 1. Criar uma Release na página [Releases do repositório](https://github.com/Lvc4br/ponte/releases).
 2. Usar uma identificação de versão, por exemplo `EGT v1.0.0`.
-3. Anexar somente `EGT.exe) como ativo da Release.
+3. Anexar somente `EGT.exe` como ativo da Release.
 4. Publicar a Release e manter o link de download nesta documentação.
 
 Não colocar `EGT.exe` no histórico normal do Git. Não publicar a pasta `data`, bancos SQLite reais, planilhas ou documentos de usuários.
