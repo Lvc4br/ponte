@@ -1503,11 +1503,13 @@ class PonteMainWindow(QMainWindow):
         if table_id is None:
             self.analysis_columns = []
             self.analysis_records = []
+            self.analysis_filtered_records = []
             self.analysis_count.setText("Este projeto ainda não possui tabelas importadas.")
             self.analysis_results_count.setText("Nenhum conjunto selecionado.")
             self.analysis_table.clear()
             self.analysis_table.setRowCount(0)
             self.analysis_table.setColumnCount(0)
+            self._update_analysis_indicators(None)
             for field, minimum, maximum in self.analysis_filter_rows:
                 field.blockSignals(False)
                 minimum.clear()
