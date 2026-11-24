@@ -1965,10 +1965,27 @@ class PonteMainWindow(QMainWindow):
         self.refresh_pages()
 
     def refresh_pages(self):
-        current = self.stack.currentIndex()
-        self.stack.removeWidget(self.pages["Projetos e obras"])
-        self.pages["Projetos e obras"].deleteLater()
-        new_page = self._projects_page()
-        self.pages["Projetos e obras"] = new_page
-        self.stack.insertWidget(1, new_page)
-        self.stack.setCurrentIndex(current)
+        """Refresh all modules whose content depends on imported workspace records."""
+        current_widget = self.stack.currentWidget()
+        current_name = next(
+            (name for name, widget in self.pages.items() if widget is current_widget),
+            "Visão geral",
+        )
+        builders = {
+            "Visão geral": self._overview_page,
+            "Projetos e obras": self._projects_page,
+            "Pontes e OAEs": self._bridges_page,
+            "Importar dados": self._import_page,
+            "Análise de engenharia": self._analysis_page,
+        }
+        for name, builder in builders.items():
+            old = self.pages.get(name)
+            if old is None:
+                continue
+            index = self.stack.indexOf(old)
+            self.stack.removeWidget(old)
+            old.deleteLater()
+            new_page = builder()
+            self.pages[name] = new_page
+            self.stack.insertWidget(index, new_page)
+        self.navigate(current_name)
