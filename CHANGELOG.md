@@ -1,16 +1,19 @@
 # Changelog
 
-## Em desenvolvimento — PONTE Gerenciador Universal
+## EGT — entrega desktop inicial concluída
 
-- Consolidado o objetivo de gerenciador universal de dados e documentos para projetos de qualquer setor.
-- Criado workspace SQLite com projetos, tabelas, colunas tipadas, registros e relacionamentos.
-- Criadas operações CRUD, validação, filtros, ordenação e paginação para tabelas genéricas.
-- Adicionado motor de fórmulas seguro baseado em AST, com colunas calculadas e referências a nomes de colunas entre colchetes.
-- Criada interface inicial para projetos e tabelas, com edição de células e colunas calculadas.
-- Criados adaptadores de importação/exportação CSV e XLSX/XLSM.
-- Adicionada migração aditiva versionada do esquema do workspace.
-- Ampliado scanner para DOC/PPT/RTF/ODT/ODP via LibreOffice, XLSB, PDF com tabelas, DWG via ODA opcional, IFC com propriedades e reconhecimento de RVT/RFA.
-- Adicionadas verificações de segurança para containers Office/OpenDocument.
-- Atualizados testes automatizados, dependências e workflows de CI e pacote Windows.
+- Encerrada a implementação da entrega desktop Windows do EGT.
+- Aplicativo empacotado em arquivo único `EGT.exe` (PyInstaller One File).
+- Persistência local em SQLite, separada do executável.
+- Testada a inicialização, abertura da janela, fechamento e persistência local no ambiente de desenvolvimento.
+- Verificada a integridade do banco SQLite local.
+- Definido o procedimento de atualização preservando a pasta `data`.
+- Próximas publicações destinadas somente a correções, segurança, compatibilidade, estabilidade e melhorias pontuais.
 
-As alterações ainda precisam passar pelo GitHub Actions, build Windows e smoke test do executável antes de qualquer atualização do PC.
+### Validações complementares
+
+Ainda precisam ser confirmados o primeiro arranque em pasta vazia, a execução em Windows sem Python e a atualização em uma instalação independente. Consulte [docs/EGT/ENTREGA_DESKTOP_ONEFILE.md](docs/EGT/ENTREGA_DESKTOP_ONEFILE.md).
+
+### Distribuição
+
+O binário `EGT.exe` deve ser anexado como ativo de uma Release do GitHub. Não versionar o executável de aproximadamente 109 MB nem bancos de dados de usuários no histórico comum do Git.
