@@ -1,4 +1,4 @@
-"""PONTE v2 application shell aligned with the approved desktop design system.
+"""EGT application shell aligned with the approved desktop design system.
 
 The shell provides persistent module navigation and a light operational workspace.
 Only values backed by local stores are shown as metrics; unavailable indicators are
@@ -109,7 +109,7 @@ class FileDropFrame(QFrame):
 class PonteMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PONTE | Engenharia • Inteligência")
+        self.setWindowTitle("EGT | Engenharia • Inteligência")
         self.resize(1440, 900)
         self.setMinimumSize(1120, 720)
 
@@ -131,7 +131,7 @@ class PonteMainWindow(QMainWindow):
         side.setContentsMargins(13, 22, 13, 16)
         side.setSpacing(7)
 
-        brand = QLabel("PONTE")
+        brand = QLabel("EGT")
         brand.setObjectName("brand")
         side.addWidget(brand)
         tagline = QLabel("ENGENHARIA • INTELIGÊNCIA")
@@ -376,7 +376,7 @@ class PonteMainWindow(QMainWindow):
         text = QVBoxLayout()
         heading = QLabel("Acompanhe seus dados de engenharia")
         heading.setStyleSheet("font-size:14pt;font-weight:700;color:#26384b;")
-        sub = QLabel("Resumo atualizado a partir dos registros locais do PONTE.")
+        sub = QLabel("Resumo atualizado a partir dos registros locais da EGT.")
         sub.setObjectName("sectionIntro")
         text.addWidget(heading)
         text.addWidget(sub)
@@ -908,7 +908,7 @@ class PonteMainWindow(QMainWindow):
         heading.setMinimumHeight(32)
         heading.setStyleSheet("font-size:16pt;font-weight:700;color:#26384b;")
         subtitle = QLabel(
-            "Traga planilhas existentes para o PONTE mantendo a origem e a rastreabilidade."
+            "Traga planilhas existentes para a EGT mantendo a origem e a rastreabilidade."
         )
         subtitle.setObjectName("sectionIntro")
         subtitle.setMinimumHeight(25)
@@ -1411,6 +1411,14 @@ class PonteMainWindow(QMainWindow):
             "Médias dos indicadores de engenharia",
             "Média aritmética descritiva dos registros exibidos; o tipo de obra e os filtros numéricos são opcionais."
         )
+        self.analysis_total_label = QLabel("OBRAS NO RECORTE: 0")
+        self.analysis_total_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.analysis_total_label.setMinimumHeight(58)
+        self.analysis_total_label.setStyleSheet(
+            "QLabel { background:#e8f1f8; color:#173f5f; border:1px solid #bfd2e1; "
+            "border-radius:8px; padding:10px; font-size:18pt; font-weight:800; }"
+        )
+        indicators.body.addWidget(self.analysis_total_label)
         metric_grid = QGridLayout()
         metric_grid.setHorizontalSpacing(10)
         metric_grid.setVerticalSpacing(8)
@@ -1459,9 +1467,6 @@ class PonteMainWindow(QMainWindow):
             "Resultados da seleção",
             "Linhas da tabela importada • use as barras para percorrer colunas e registros."
         )
-        self.analysis_total_label = QLabel("Total de obras selecionadas: 0")
-        self.analysis_total_label.setStyleSheet("font-size:12pt;font-weight:700;color:#294b67;padding:3px 0;")
-        results.body.addWidget(self.analysis_total_label)
         self.analysis_results_count = QLabel("Nenhum conjunto selecionado.")
         self.analysis_results_count.setObjectName("mutedSmall")
         results.body.addWidget(self.analysis_results_count)
@@ -1532,7 +1537,7 @@ class PonteMainWindow(QMainWindow):
             self.analysis_filtered_records = []
             self.analysis_count.setText("Este projeto ainda não possui tabelas importadas.")
             self.analysis_results_count.setText("Nenhum conjunto selecionado.")
-            self.analysis_total_label.setText("Total de obras selecionadas: 0")
+            self.analysis_total_label.setText("OBRAS NO RECORTE: 0")
             self.analysis_table.clear()
             self.analysis_table.setRowCount(0)
             self.analysis_table.setColumnCount(0)
@@ -1647,7 +1652,7 @@ class PonteMainWindow(QMainWindow):
             + (" · pesquisa textual ativa" if needle else "")
         )
         self.analysis_count.setText(message)
-        self.analysis_total_label.setText(f"Total de obras selecionadas: {len(selected)}")
+        self.analysis_total_label.setText(f"OBRAS NO RECORTE: {len(selected)}")
         self.analysis_results_count.setText(message)
         # A média usa exatamente o recorte exibido. Sem tipo selecionado, considera todos os tipos;
         # filtros numéricos isolados (inclusive somente máximo) também geram médias.
