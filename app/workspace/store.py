@@ -236,6 +236,32 @@ class WorkspaceStore:
             cursor = db.execute("DELETE FROM workspace_tables WHERE id=?", (int(table_id),))
             return cursor.rowcount == 1
 
+    def replace_tables(self, replacements) -> None:
+        """Atomically replace existing tables with fully imported staging tables.
+
+        Each item is (existing_table_id, staged_table_id, final_name). The old
+        table is removed only after every replacement has been imported.
+        """
+        with self._connect() as db:
+            for existing_id, staged_id, final_name in replacements:
+                existing = db.execute(
+                    "SELECT project_id FROM workspace_tables WHERE id=?",
+                    (int(existing_id),),
+                ).fetchone()
+                staged = db.execute(
+                    "SELECT project_id FROM workspace_tables WHERE id=?",
+                    (int(staged_id),),
+                ).fetchone()
+                if existing is None or staged is None:
+                    raise KeyError("Uma das tabelas da substituição não existe mais.")
+                if existing["project_id"] != staged["project_id"]:
+                    raise ValueError("As tabelas da substituição devem pertencer ao mesmo projeto.")
+                db.execute("DELETE FROM workspace_tables WHERE id=?", (int(existing_id),))
+                db.execute(
+                    "UPDATE workspace_tables SET name=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (self._name(final_name, "Nome da tabela"), int(staged_id)),
+                )
+
     def add_column(self, table_id: int, name: str, data_type="text", *,
                    required=False, default=None, position=None, formula=None) -> int:
         name = self._name(name, "Nome da coluna")

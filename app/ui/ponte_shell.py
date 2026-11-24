@@ -682,6 +682,14 @@ class PonteMainWindow(QMainWindow):
         layout.addWidget(heading)
         layout.addWidget(subtitle)
 
+        management_row = QHBoxLayout()
+        management_row.addStretch(1)
+        manage_tables = QPushButton("Gerenciar tabelas existentes")
+        manage_tables.setObjectName("secondaryAction")
+        manage_tables.clicked.connect(self.open_spreadsheet_workspace)
+        management_row.addWidget(manage_tables)
+        layout.addLayout(management_row)
+
         # Large, uncluttered drop zone as shown in the approved import screen.
         drop_area = FileDropFrame(self.select_import_file)
         drop_area.setObjectName("importDropArea")
@@ -805,7 +813,7 @@ class PonteMainWindow(QMainWindow):
         return page
 
     def select_import_file(self, selected_path=None):
-        """Preview a source file and import it into a selected local project after confirmation."""
+        """Preview a source file and resolve table-name conflicts before importing."""
         path = selected_path
         if not path:
             path, _ = QFileDialog.getOpenFileName(
@@ -845,6 +853,7 @@ class PonteMainWindow(QMainWindow):
                 preview = exchange.preview_csv(path, limit=5)
                 rows = preview.get("rows", [])
                 preview_text = "\n".join("  |  ".join(map(str, row[:6])) for row in rows[:6])
+                source_names = [Path(path).stem]
             elif suffix in {".xls", ".xlsb"}:
                 preview = (
                     exchange.preview_xls(path, limit=5)
@@ -852,15 +861,68 @@ class PonteMainWindow(QMainWindow):
                     else exchange.preview_xlsb(path, limit=5)
                 )
                 preview_text = self._format_sheet_preview(preview.get("sheets", []))
+                source_names = [item["sheet_name"] for item in preview.get("sheets", [])]
             elif suffix in {".xlsx", ".xlsm"}:
                 preview = exchange.preview_xlsx(path, limit=5)
                 preview_text = self._format_sheet_preview(preview.get("sheets", []))
+                source_names = [item["sheet_name"] for item in preview.get("sheets", [])]
             else:
                 QMessageBox.warning(self, "Formato não suportado", "Selecione XLSX, XLSM, XLS, XLSB ou CSV.")
                 return
         except Exception as exc:
             QMessageBox.warning(self, "Não foi possível ler a planilha", str(exc))
             return
+
+        existing_tables = self.store.list_tables(project_id)
+        existing_by_name = {item["name"].casefold(): item for item in existing_tables}
+        conflicts = [name for name in source_names if name.casefold() in existing_by_name]
+        strategy = "normal"
+        table_names = {}
+        staged_names = {}
+        if conflicts:
+            conflict_text = "\n".join(f"• {name}" for name in conflicts)
+            choice = QMessageBox(self)
+            choice.setWindowTitle("Tabelas com nomes existentes")
+            choice.setIcon(QMessageBox.Icon.Warning)
+            choice.setText(
+                "O projeto já contém tabela(s) com estes nomes:\n\n"
+                f"{conflict_text}\n\n"
+                "Escolha como deseja continuar. A substituição só acontece depois "
+                "que a nova planilha for importada com sucesso."
+            )
+            replace_button = choice.addButton(
+                "Substituir existentes", QMessageBox.ButtonRole.DestructiveRole
+            )
+            rename_button = choice.addButton(
+                "Importar com outro nome", QMessageBox.ButtonRole.AcceptRole
+            )
+            choice.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+            choice.exec()
+            clicked = choice.clickedButton()
+            if clicked is replace_button:
+                strategy = "replace"
+            elif clicked is rename_button:
+                strategy = "rename"
+            else:
+                return
+
+            used_names = {item["name"].casefold() for item in existing_tables}
+            for index, name in enumerate(conflicts, start=1):
+                if strategy == "replace":
+                    candidate = f"__PONTE_STAGING_{project_id}_{index}__"
+                    while candidate.casefold() in used_names:
+                        candidate += "_"
+                    table_names[name] = candidate
+                    staged_names[name] = candidate
+                    used_names.add(candidate.casefold())
+                else:
+                    candidate = f"{name} (2)"
+                    number = 2
+                    while candidate.casefold() in used_names:
+                        number += 1
+                        candidate = f"{name} ({number})"
+                    table_names[name] = candidate
+                    used_names.add(candidate.casefold())
 
         question = QMessageBox(self)
         question.setWindowTitle("Conferir prévia da importação")
@@ -877,35 +939,57 @@ class PonteMainWindow(QMainWindow):
         if question.exec() != QMessageBox.StandardButton.Yes:
             return
 
+        created = []
         try:
             if suffix == ".csv":
-                created = [exchange.import_csv(project_id, path)]
+                target_name = table_names.get(source_names[0], source_names[0])
+                created = [exchange.import_csv(project_id, path, table_name=target_name)]
             elif suffix == ".xls":
-                created = exchange.import_xls(project_id, path)
+                created = exchange.import_xls(project_id, path, table_names=table_names)
             elif suffix == ".xlsb":
-                created = exchange.import_xlsb(project_id, path)
+                created = exchange.import_xlsb(project_id, path, table_names=table_names)
             else:
-                created = exchange.import_xlsx(project_id, path)
-            self.refresh_pages()
-            self.navigate("Importar dados")
-            QMessageBox.information(
-                self,
-                "Importação concluída",
-                f"{len(created)} tabela(s) criada(s) no projeto selecionado.\n"
-                "Os dados foram gravados no workspace local.\n"
-                "O arquivo de origem permaneceu no local original.",
-            )
-            open_workspace = QMessageBox.question(
-                self,
-                "Consultar dados importados",
-                "Deseja abrir a ferramenta auxiliar de planilhas para consultar os registros?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes,
-            )
-            if open_workspace == QMessageBox.StandardButton.Yes:
-                self.open_spreadsheet_workspace()
+                created = exchange.import_xlsx(project_id, path, table_names=table_names)
+
+            if strategy == "replace":
+                current_tables = self.store.list_tables(project_id)
+                current_by_name = {item["name"]: item for item in current_tables}
+                replacements = []
+                for original_name, staged_name in staged_names.items():
+                    old = existing_by_name[original_name.casefold()]
+                    staged = current_by_name.get(staged_name)
+                    if staged is not None:
+                        replacements.append((old["id"], staged["id"], original_name))
+                if replacements:
+                    self.store.replace_tables(replacements)
         except Exception as exc:
+            if strategy == "replace":
+                for table_id in created:
+                    try:
+                        self.store.delete_table(table_id)
+                    except Exception:
+                        pass
             QMessageBox.critical(self, "Falha na importação", str(exc))
+            return
+
+        self.refresh_pages()
+        self.navigate("Importar dados")
+        QMessageBox.information(
+            self,
+            "Importação concluída",
+            f"{len(created)} tabela(s) criada(s) no projeto selecionado.\n"
+            "Os dados foram gravados no workspace local.\n"
+            "O arquivo de origem permaneceu no local original.",
+        )
+        open_workspace = QMessageBox.question(
+            self,
+            "Consultar dados importados",
+            "Deseja abrir a ferramenta auxiliar de planilhas para consultar os registros?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if open_workspace == QMessageBox.StandardButton.Yes:
+            self.open_spreadsheet_workspace()
 
     @staticmethod
     def _format_sheet_preview(sheets):

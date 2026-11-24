@@ -60,3 +60,24 @@ def test_delete_project_removes_its_tables_and_records(tmp_path):
     assert store.delete_project(project_id) is True
     assert store.list_projects() == []
     assert store.list_tables(project_id) == []
+
+
+
+def test_replace_tables_swaps_staged_table_only_after_import(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspace.sqlite3")
+    project_id = store.create_project("Projeto")
+    old_id = store.create_table(project_id, "Base_limpa")
+    store.add_column(old_id, "antigo")
+    store.insert_record(old_id, {"antigo": "preservado até substituição"})
+
+    staged_id = store.create_table(project_id, "__PONTE_STAGING__")
+    store.add_column(staged_id, "novo")
+    store.insert_record(staged_id, {"novo": "dados novos"})
+
+    store.replace_tables([(old_id, staged_id, "Base_limpa")])
+
+    tables = store.list_tables(project_id)
+    assert len(tables) == 1
+    assert tables[0]["name"] == "Base_limpa"
+    assert store.list_records(staged_id)[0]["values"] == {"novo": "dados novos"}
+    assert [column["name"] for column in store.list_columns(staged_id)] == ["novo"]
