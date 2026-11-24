@@ -29,13 +29,8 @@ from app.core.models import BridgeRecord
 
 
 NAV_ITEMS = [
-    ("Visão geral", "⌂"),
-    ("Projetos e obras", "▦"),
-    ("Pontes e OAEs", "▤"),
     ("Importar dados", "⇧"),
     ("Análise de engenharia", "⌕"),
-    ("Documentos", "▧"),
-    ("Relatórios", "▥"),
 ]
 
 
@@ -186,7 +181,7 @@ class PonteMainWindow(QMainWindow):
         self.setStyleSheet(self._stylesheet())
 
         self._build_pages()
-        self.navigate("Visão geral")
+        self.navigate("Importar dados")
 
     def _stylesheet(self) -> str:
         return """
@@ -223,13 +218,9 @@ class PonteMainWindow(QMainWindow):
         """
 
     def _build_pages(self):
-        self._add_page("Visão geral", self._overview_page())
-        self._add_page("Projetos e obras", self._projects_page())
-        self._add_page("Pontes e OAEs", self._bridges_page())
+        # The current product scope exposes only data import and engineering analysis.
         self._add_page("Importar dados", self._import_page())
         self._add_page("Análise de engenharia", self._analysis_page())
-        self._add_page("Documentos", self._documents_page())
-        self._add_page("Relatórios", self._reports_page())
 
     def _add_page(self, name: str, page: QWidget):
         self.pages[name] = page
@@ -2035,12 +2026,9 @@ class PonteMainWindow(QMainWindow):
         current_widget = self.stack.currentWidget()
         current_name = next(
             (name for name, widget in self.pages.items() if widget is current_widget),
-            "Visão geral",
+            "Importar dados",
         )
         builders = {
-            "Visão geral": self._overview_page,
-            "Projetos e obras": self._projects_page,
-            "Pontes e OAEs": self._bridges_page,
             "Importar dados": self._import_page,
             "Análise de engenharia": self._analysis_page,
         }
