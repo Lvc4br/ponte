@@ -248,7 +248,8 @@ class PonteMainWindow(QMainWindow):
             "Documentos": "Biblioteca documental",
             "Relatórios": "Relatórios e exportações",
         }.get(name, name))
-        self.breadcrumb.setText(f"Ponte  /  {name}")        for title, button in self.nav_buttons.items():
+        self.breadcrumb.setText(f"Ponte  /  {name}")
+        for title, button in self.nav_buttons.items():
             button.setChecked(title == name)
 
     def _metric_row(self, cards: list[MetricCard]) -> QWidget:
@@ -496,7 +497,8 @@ class PonteMainWindow(QMainWindow):
 
         listing = Panel("Pontes e OAEs", "Registros importados • consulta da base local")
         self.bridge_search = QLineEdit()
-        self.bridge_search.setPlaceholderText("Buscar por código, tipologia ou valor de origem…")        self.bridge_search.textChanged.connect(self._filter_bridge_records)
+        self.bridge_search.setPlaceholderText("Buscar por código, tipologia ou valor de origem…")
+        self.bridge_search.textChanged.connect(self._filter_bridge_records)
         listing.body.addWidget(self.bridge_search)
         self.bridge_table = QTableWidget(len(self.bridge_records), 5)
         self.bridge_table.setHorizontalHeaderLabels([
@@ -744,7 +746,8 @@ class PonteMainWindow(QMainWindow):
         # Large, uncluttered drop zone as shown in the approved import screen.
         drop_area = FileDropFrame(self.select_import_file)
         drop_area.setObjectName("importDropArea")
-        drop_area.setMinimumHeight(154)        drop_area.setStyleSheet(
+        drop_area.setMinimumHeight(154)
+        drop_area.setStyleSheet(
             "QFrame#importDropArea {background:#ffffff;border:1px dashed #8fb4d0;"
             "border-radius:8px;}"        )
         drop_layout = QVBoxLayout(drop_area)
@@ -992,10 +995,12 @@ class PonteMainWindow(QMainWindow):
         try:
             if suffix == ".csv":
                 target_name = table_names.get(source_names[0], source_names[0])
-                created = [exchange.import_csv(project_id, path, table_name=target_name)]            elif suffix == ".xls":
+                created = [exchange.import_csv(project_id, path, table_name=target_name)]
+            elif suffix == ".xls":
                 created = exchange.import_xls(project_id, path, table_names=table_names)
             elif suffix == ".xlsb":
-                created = exchange.import_xlsb(project_id, path, table_names=table_names)            else:
+                created = exchange.import_xlsb(project_id, path, table_names=table_names)
+            else:
                 created = exchange.import_xlsx(project_id, path, table_names=table_names)
 
             if strategy == "replace":
@@ -1244,7 +1249,8 @@ class PonteMainWindow(QMainWindow):
             if not name or (not low_text and not high_text):
                 continue
             low = self._analysis_number(low_text) if low_text else None
-            high = self._analysis_number(high_text) if high_text else None            if low_text and low is None or high_text and high is None:
+            high = self._analysis_number(high_text) if high_text else None
+            if low_text and low is None or high_text and high is None:
                 self.analysis_count.setText("Use limites numéricos válidos. Exemplo: 12,5.")
                 return
             if low is not None and high is not None and low > high:
@@ -1493,7 +1499,8 @@ class PonteMainWindow(QMainWindow):
                 f"{failures} arquivo(s) com avisos, falhas ou formato sem leitor. "
                 "A extração não representa validação técnica."
             )
-        except Exception as exc:            QMessageBox.critical(self, "Falha ao indexar documentos", str(exc))
+        except Exception as exc:
+            QMessageBox.critical(self, "Falha ao indexar documentos", str(exc))
 
     def refresh_document_page(self):
         current = self.stack.currentIndex()
