@@ -247,8 +247,7 @@ class PonteMainWindow(QMainWindow):
             "Análise de engenharia": "Filtros e indicadores",
             "Documentos": "Biblioteca documental",
             "Relatórios": "Relatórios e exportações",
-        }.get(name, name))
-        self.breadcrumb.setText(f"Ponte  /  {name}")
+        }.get(name, name))        self.breadcrumb.setText(f"Ponte  /  {name}")
         for title, button in self.nav_buttons.items():
             button.setChecked(title == name)
 
@@ -497,8 +496,7 @@ class PonteMainWindow(QMainWindow):
 
         listing = Panel("Pontes e OAEs", "Registros importados • consulta da base local")
         self.bridge_search = QLineEdit()
-        self.bridge_search.setPlaceholderText("Buscar por código, tipologia ou valor de origem…")
-        self.bridge_search.textChanged.connect(self._filter_bridge_records)
+        self.bridge_search.setPlaceholderText("Buscar por código, tipologia ou valor de origem…")        self.bridge_search.textChanged.connect(self._filter_bridge_records)
         listing.body.addWidget(self.bridge_search)
 
         self.bridge_table = QTableWidget(len(self.bridge_records), 5)
@@ -747,8 +745,7 @@ class PonteMainWindow(QMainWindow):
         # Large, uncluttered drop zone as shown in the approved import screen.
         drop_area = FileDropFrame(self.select_import_file)
         drop_area.setObjectName("importDropArea")
-        drop_area.setMinimumHeight(154)
-        drop_area.setStyleSheet(
+        drop_area.setMinimumHeight(154)        drop_area.setStyleSheet(
             "QFrame#importDropArea {background:#ffffff;border:1px dashed #8fb4d0;"
             "border-radius:8px;}"
         )
@@ -997,8 +994,7 @@ class PonteMainWindow(QMainWindow):
         try:
             if suffix == ".csv":
                 target_name = table_names.get(source_names[0], source_names[0])
-                created = [exchange.import_csv(project_id, path, table_name=target_name)]
-            elif suffix == ".xls":
+                created = [exchange.import_csv(project_id, path, table_name=target_name)]            elif suffix == ".xls":
                 created = exchange.import_xls(project_id, path, table_names=table_names)
             elif suffix == ".xlsb":
                 created = exchange.import_xlsb(project_id, path, table_names=table_names)
@@ -1046,121 +1042,249 @@ class PonteMainWindow(QMainWindow):
         return "\n".join(lines) or "Nenhuma linha encontrada na prévia."
 
     def _analysis_page(self) -> QWidget:
-        """Engineering analysis layout; unavailable calculations are never fabricated."""
+        """Interactive analysis over imported workspace tables; no unapproved indicators are calculated."""
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(14)
+        layout.setSpacing(12)
 
-        intro = QVBoxLayout()
         heading = QLabel("Análise de dados de pontes e OAEs")
         heading.setStyleSheet("font-size:14pt;font-weight:700;color:#26384b;")
         subtitle = QLabel(
-            "Defina intervalos, combine critérios e examine apenas amostras tecnicamente comparáveis."
+            "Selecione um projeto e uma tabela importada. Os filtros consultam os valores "
+            "armazenados no workspace; indicadores técnicos aguardam validação metodológica."
         )
         subtitle.setObjectName("sectionIntro")
-        intro.addWidget(heading)
-        intro.addWidget(subtitle)
-        layout.addLayout(intro)
+        subtitle.setWordWrap(True)
+        layout.addWidget(heading)
+        layout.addWidget(subtitle)
 
-        scope = Panel("CONJUNTO DE DADOS", "Escopo da análise")
-        scope_row = QHBoxLayout()
-        dataset = QComboBox()
-        dataset.addItem("Conjuntos importados — integração pendente")
-        dataset.setEnabled(False)
-        entity_scope = QComboBox()
-        entity_scope.addItem("Todas as OAEs — cadastro não integrado")
-        entity_scope.setEnabled(False)
-        scope_row.addWidget(QLabel("Conjunto"))
-        scope_row.addWidget(dataset, 2)
-        scope_row.addWidget(QLabel("Escopo"))
-        scope_row.addWidget(entity_scope, 2)
-        scope.body.addLayout(scope_row)
+        scope = Panel("CONJUNTO DE DADOS", "Seleção vinculada ao repositório local")
+        selectors = QHBoxLayout()
+        selectors.addWidget(QLabel("Projeto"))
+        self.analysis_project = QComboBox()
+        for project in self.store.list_projects():
+            self.analysis_project.addItem(project["name"], project["id"])
+        selectors.addWidget(self.analysis_project, 1)
+        selectors.addWidget(QLabel("Conjunto"))
+        self.analysis_dataset = QComboBox()
+        selectors.addWidget(self.analysis_dataset, 2)
+        scope.body.addLayout(selectors)
         layout.addWidget(scope)
 
-        content = QHBoxLayout()
-        filters = Panel("Filtros por intervalo", "Campos previstos no design de análise")
-        filter_grid = QGridLayout()
-        filter_grid.addWidget(QLabel("Grandeza"), 0, 0)
-        filter_grid.addWidget(QLabel("Mínimo"), 0, 1)
-        filter_grid.addWidget(QLabel("Máximo"), 0, 2)
-        for row, label in enumerate(
-            ("Comprimento total (m)", "Largura do tabuleiro (m)",
-             "Área do tabuleiro (m²)", "Volume de concreto (m³)"), start=1
-        ):
-            filter_grid.addWidget(QLabel(label), row, 0)
+        body = QHBoxLayout()
+        filters = Panel("Filtros por intervalo", "Escolha uma coluna numérica real da tabela e informe limites opcionais")
+        self.analysis_filter_rows = []
+        grid = QGridLayout()
+        grid.addWidget(QLabel("Campo numérico"), 0, 0)
+        grid.addWidget(QLabel("Mínimo"), 0, 1)
+        grid.addWidget(QLabel("Máximo"), 0, 2)
+        for index in range(4):
+            field = QComboBox()
+            field.setMinimumWidth(160)
             minimum = QLineEdit()
+            minimum.setPlaceholderText("Sem mínimo")
             maximum = QLineEdit()
-            minimum.setPlaceholderText("Mín.")
-            maximum.setPlaceholderText("Máx.")
-            minimum.setEnabled(False)
-            maximum.setEnabled(False)
-            filter_grid.addWidget(minimum, row, 1)
-            filter_grid.addWidget(maximum, row, 2)
-        filters.body.addLayout(filter_grid)
-        filter_note = QLabel(
-            "Filtros serão habilitados quando o repositório de OAEs e os campos geométricos "
-            "estiverem conectados."
-        )
-        filter_note.setObjectName("mutedSmall")
-        filter_note.setWordWrap(True)
-        filters.body.addWidget(filter_note)
-        content.addWidget(filters, 1)
+            maximum.setPlaceholderText("Sem máximo")
+            grid.addWidget(field, index + 1, 0)
+            grid.addWidget(minimum, index + 1, 1)
+            grid.addWidget(maximum, index + 1, 2)
+            self.analysis_filter_rows.append((field, minimum, maximum))
+        filters.body.addLayout(grid)
+        search_row = QHBoxLayout()
+        self.analysis_search = QLineEdit()
+        self.analysis_search.setPlaceholderText("Pesquisar em todos os campos…")
+        search_row.addWidget(self.analysis_search, 1)
+        apply_button = QPushButton("Aplicar filtros")
+        apply_button.setObjectName("primaryAction")
+        apply_button.clicked.connect(self._apply_analysis_filters)
+        search_row.addWidget(apply_button)
+        clear_button = QPushButton("Limpar")
+        clear_button.setObjectName("secondaryAction")
+        clear_button.clicked.connect(self._clear_analysis_filters)
+        search_row.addWidget(clear_button)
+        filters.body.addLayout(search_row)
+        self.analysis_count = QLabel("Selecione um conjunto para consultar os registros.")
+        self.analysis_count.setObjectName("mutedSmall")
+        self.analysis_count.setWordWrap(True)
+        filters.body.addWidget(self.analysis_count)
+        body.addWidget(filters, 1)
 
-        results = Panel("Resultados da seleção", "Indicadores de engenharia — sem valores presumidos")
-        metrics = QGridLayout()
-        metric_names = [
-            ("Paf", "kg/m²"), ("Pap", "kg/m²"), ("Ecm", "m³/m²"),
+        results = Panel("Resultados da seleção", "Registros retornados diretamente da tabela escolhida")
+        self.analysis_table = QTableWidget(0, 0)
+        self.analysis_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.analysis_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.analysis_table.setAlternatingRowColors(True)
+        self.analysis_table.verticalHeader().setVisible(False)
+        self.analysis_table.horizontalHeader().setStretchLastSection(True)
+        self.analysis_table.setMinimumHeight(280)
+        results.body.addWidget(self.analysis_table, 1)
+        body.addWidget(results, 2)
+        layout.addLayout(body, 1)
+
+        indicators = Panel("Indicadores de engenharia", "Não calculados até aprovação das fórmulas, unidades e regras de comparabilidade pela EGT")
+        metric_grid = QGridLayout()
+        for index, (name, unit) in enumerate([
+            ("Paf", "kg/m²"), ("Pap", "kg/m²"), ("Ecm", "unidade a validar"),
             ("Af", "m²/m²"), ("Aço total indicativo", "kg/m²"),
             ("Aço total indicativo", "kg/m³"),
-        ]
-        for index, (name, unit) in enumerate(metric_names):
+        ]):
             card = QFrame()
-            card.setStyleSheet(
-                "QFrame {background:#eaf3fa;border:1px solid #d7e6f1;border-radius:6px;}"
-            )
+            card.setStyleSheet("QFrame {background:#f4f7fa;border:1px solid #e1e7ed;border-radius:6px;}")
             box = QVBoxLayout(card)
-            box.setContentsMargins(10, 9, 10, 9)
+            box.setContentsMargins(10, 8, 10, 8)
             label = QLabel(name)
             label.setObjectName("mutedSmall")
             value = QLabel("Não calculado")
-            value.setStyleSheet("font-size:14pt;font-weight:700;color:#294b67;")
-            unit_label = QLabel(unit + " • fórmula/validação pendente")
+            value.setStyleSheet("font-size:13pt;font-weight:700;color:#294b67;")
+            unit_label = QLabel(unit)
             unit_label.setObjectName("mutedSmall")
-            unit_label.setWordWrap(True)
             box.addWidget(label)
             box.addWidget(value)
             box.addWidget(unit_label)
-            metrics.addWidget(card, index // 3, index % 3)
-        results.body.addLayout(metrics)
-
-        table = QTableWidget(0, 6)
-        table.setHorizontalHeaderLabels(
-            ["Identificação", "Tipologia", "Vão total (m)", "Concreto (m³)", "Aço (kg)", "Status"]
-        )
-        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        table.verticalHeader().setVisible(False)
-        table.horizontalHeader().setStretchLastSection(True)
-        table.setMinimumHeight(170)
-        results.body.addWidget(table, 1)
-        empty = QLabel(
-            "Nenhuma amostra exibida. O cadastro técnico e os critérios de comparabilidade "
-            "ainda não estão conectados."
-        )
-        empty.setObjectName("mutedSmall")
-        empty.setWordWrap(True)
-        results.body.addWidget(empty)
-        content.addWidget(results, 2)
-        layout.addLayout(content, 1)
+            metric_grid.addWidget(card, index // 3, index % 3)
+        indicators.body.addLayout(metric_grid)
+        layout.addWidget(indicators)
 
         note = QLabel(
-            "Nota metodológica: Paf, Pap, Ecm, Af e os indicadores de aço dependem de "
-            "definições, unidades e fórmulas aprovadas pela EGT. Nenhum resultado é estimado nesta tela."
+            "Integridade metodológica: os filtros acima operam sobre os dados importados, "
+            "sem alterar a origem. Paf, Pap, Ecm, Af e aço permanecem sem cálculo até que "
+            "definições, unidades e fórmulas sejam formalmente validadas."
         )
         note.setWordWrap(True)
-        note.setStyleSheet("background:#fff5e5;color:#93621f;padding:11px;border-radius:6px;")
+        note.setStyleSheet("background:#fff5e5;color:#93621f;padding:10px;border-radius:6px;")
         layout.addWidget(note)
+
+        self.analysis_project.currentIndexChanged.connect(self._refresh_analysis_tables)
+        self.analysis_dataset.currentIndexChanged.connect(self._analysis_dataset_changed)
+        self.analysis_search.textChanged.connect(self._apply_analysis_filters)
+        self._refresh_analysis_tables()
         return page
+
+    def _refresh_analysis_tables(self, *_):
+        if not hasattr(self, "analysis_dataset"):
+            return
+        self.analysis_dataset.blockSignals(True)
+        self.analysis_dataset.clear()
+        project_id = self.analysis_project.currentData()
+        if project_id is not None:
+            for table in self.store.list_tables(project_id):
+                count = len(self.store.list_records(table["id"]))
+                self.analysis_dataset.addItem(
+                    f'{table["name"]}  ·  {count} registros', table["id"]
+                )
+        self.analysis_dataset.blockSignals(False)
+        self._analysis_dataset_changed()
+
+    def _analysis_dataset_changed(self, *_):
+        if not hasattr(self, "analysis_dataset"):
+            return
+        table_id = self.analysis_dataset.currentData()
+        for field, minimum, maximum in self.analysis_filter_rows:
+            field.blockSignals(True)
+            field.clear()
+            field.addItem("Selecionar campo", None)
+        if table_id is None:
+            self.analysis_columns = []
+            self.analysis_count.setText("Este projeto ainda não possui tabelas importadas.")
+            self.analysis_table.clear()
+            self.analysis_table.setRowCount(0)
+            self.analysis_table.setColumnCount(0)
+            for field, minimum, maximum in self.analysis_filter_rows:
+                field.blockSignals(False)
+                minimum.clear()
+                maximum.clear()
+            return
+        self.analysis_columns = self.store.list_columns(table_id)
+        numeric = [c for c in self.analysis_columns if c.get("data_type") in ("integer", "decimal")]
+        preferred = ("compr_obra_m", "comprimento_total_m", "comprimento_m",
+                     "largura_m", "area_tabuleiro_m2", "volume_concreto_estimado_m3",
+                     "volume_concreto_m3")
+        for field, minimum, maximum in self.analysis_filter_rows:
+            for column in numeric:
+                field.addItem(column["name"], column["name"])
+            for name in preferred:
+                index = field.findData(name)
+                if index > 0:
+                    field.setCurrentIndex(index)
+                    break
+            field.blockSignals(False)
+            minimum.clear()
+            maximum.clear()
+        self._apply_analysis_filters()
+
+    @staticmethod
+    def _analysis_number(value):
+        if value is None or str(value).strip() == "":
+            return None
+        if isinstance(value, bool):
+            return None
+        try:
+            return float(str(value).strip().replace(",", "."))
+        except (TypeError, ValueError):
+            return None
+
+    def _clear_analysis_filters(self):
+        for field, minimum, maximum in self.analysis_filter_rows:
+            field.setCurrentIndex(0)
+            minimum.clear()
+            maximum.clear()
+        self.analysis_search.clear()
+        self._apply_analysis_filters()
+
+    def _apply_analysis_filters(self, *_):
+        if not hasattr(self, "analysis_table"):
+            return
+        table_id = self.analysis_dataset.currentData()
+        if table_id is None:
+            return
+        columns = self.store.list_columns(table_id)
+        records = self.store.list_records(table_id)
+        active_ranges = []
+        for field, minimum, maximum in self.analysis_filter_rows:
+            name = field.currentData()
+            low_text, high_text = minimum.text().strip(), maximum.text().strip()
+            if not name or (not low_text and not high_text):
+                continue
+            low = self._analysis_number(low_text) if low_text else None
+            high = self._analysis_number(high_text) if high_text else None
+            if low_text and low is None or high_text and high is None:
+                self.analysis_count.setText("Use limites numéricos válidos. Exemplo: 12,5.")
+                return
+            if low is not None and high is not None and low > high:
+                self.analysis_count.setText(f"O mínimo de '{name}' não pode ser maior que o máximo.")
+                return
+            active_ranges.append((name, low, high))
+        needle = self.analysis_search.text().strip().casefold()
+        selected = []
+        for record in records:
+            values = record["values"]
+            keep = True
+            for name, low, high in active_ranges:
+                number = self._analysis_number(values.get(name))
+                if number is None or low is not None and number < low or high is not None and number > high:
+                    keep = False
+                    break
+            if keep and needle:
+                keep = needle in " ".join(str(v) for v in values.values() if v is not None).casefold()
+            if keep:
+                selected.append(record)
+        headers = [column["name"] for column in columns]
+        self.analysis_table.clear()
+        self.analysis_table.setColumnCount(len(headers))
+        self.analysis_table.setHorizontalHeaderLabels(headers)
+        self.analysis_table.setRowCount(len(selected))
+        for row, record in enumerate(selected):
+            for col, name in enumerate(headers):
+                value = record["values"].get(name)
+                rendered = "—" if value is None else str(value)
+                self.analysis_table.setItem(row, col, QTableWidgetItem(rendered))
+        self.analysis_table.resizeColumnsToContents()
+        self.analysis_count.setText(
+            f"{len(selected)} de {len(records)} registros exibidos"
+            + (f" · {len(active_ranges)} intervalo(s) ativo(s)" if active_ranges else "")
+            + (" · pesquisa textual ativa" if needle else "")
+        )
 
     def _reports_page(self) -> QWidget:
         """Report catalog layout; generation stays disabled until validated data exists."""
@@ -1247,8 +1371,7 @@ class PonteMainWindow(QMainWindow):
         heading = QLabel("Repositório documental do empreendimento")
         heading.setStyleSheet("font-size:14pt;font-weight:700;color:#26384b;")
         subtitle = QLabel(
-            "Consulte arquivos indexados neste dispositivo. O catálogo preserva o caminho, "
-            "o hash e o resultado da extração; indexação não significa aprovação técnica."
+            "Consulte arquivos indexados neste dispositivo. O catálogo preserva o caminho, "            "o hash e o resultado da extração; indexação não significa aprovação técnica."
         )
         subtitle.setObjectName("sectionIntro")
         subtitle.setWordWrap(True)
@@ -1497,8 +1620,7 @@ class PonteMainWindow(QMainWindow):
             QMessageBox.information(self, "Renomear tabela", "Selecione uma tabela.")
             return
         new_name, accepted = QInputDialog.getText(
-            self, "Renomear tabela", "Novo nome:", text=current_name
-        )
+            self, "Renomear tabela", "Novo nome:", text=current_name        )
         if not accepted or not new_name.strip() or new_name.strip() == current_name:
             return
         try:
