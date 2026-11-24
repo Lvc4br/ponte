@@ -1322,6 +1322,13 @@ class PonteMainWindow(QMainWindow):
         filters.setMinimumWidth(320)
         filters.setMaximumWidth(390)
         filters.body.setSpacing(10)
+        filters.body.addWidget(QLabel("Tipo de obra para análise"))
+        self.analysis_work_type_filter = QComboBox()
+        self.analysis_work_type_filter.addItem("Selecione um tipo para calcular a média", None)
+        for work_type in self.store.WORK_TYPES:
+            self.analysis_work_type_filter.addItem(work_type, work_type)
+        filters.body.addWidget(self.analysis_work_type_filter)
+
         self.analysis_filter_rows = []
         grid = QGridLayout()
         grid.setHorizontalSpacing(8)
@@ -1352,13 +1359,6 @@ class PonteMainWindow(QMainWindow):
             grid.setRowMinimumHeight(index + 1, 42)
             self.analysis_filter_rows.append((field, minimum, maximum))
         filters.body.addLayout(grid)
-
-        filters.body.addWidget(QLabel("Tipo de obra para análise"))
-        self.analysis_work_type_filter = QComboBox()
-        self.analysis_work_type_filter.addItem("Selecione um tipo para calcular a média", None)
-        for work_type in self.store.WORK_TYPES:
-            self.analysis_work_type_filter.addItem(work_type, work_type)
-        filters.body.addWidget(self.analysis_work_type_filter)
 
         self.analysis_search = QLineEdit()
         self.analysis_search.setPlaceholderText("Pesquisar em todos os campos…")
