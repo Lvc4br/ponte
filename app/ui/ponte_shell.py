@@ -1322,9 +1322,8 @@ class PonteMainWindow(QMainWindow):
         filters.setMinimumWidth(320)
         filters.setMaximumWidth(390)
         filters.body.setSpacing(10)
-        filters.body.addWidget(QLabel("Tipo de obra para análise"))
         self.analysis_work_type_filter = QComboBox()
-        self.analysis_work_type_filter.addItem("Selecione um tipo para calcular a média", None)
+        self.analysis_work_type_filter.addItem("Selecionar tipo de obra", None)
         for work_type in self.store.WORK_TYPES:
             self.analysis_work_type_filter.addItem(work_type, work_type)
         filters.body.addWidget(self.analysis_work_type_filter)
