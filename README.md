@@ -2,7 +2,7 @@
 
 Aplicativo desktop Windows para organizar projetos, tabelas, registros técnicos e documentos. Esta branch contém a entrega desktop local do EGT.
 
-<badge>Projeto concluído — manutenção e atualizações</badge>
+**Status: projeto concluído — a partir daqui, somente manutenção e atualizações.**
 
 ## Situação da versão
 
