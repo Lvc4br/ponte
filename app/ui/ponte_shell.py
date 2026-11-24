@@ -1357,6 +1357,29 @@ class PonteMainWindow(QMainWindow):
         self.analysis_search.setPlaceholderText("Pesquisar em todos os campos…")
         self.analysis_search.setMinimumHeight(38)
         filters.body.addWidget(self.analysis_search)
+
+        filters.body.addWidget(QLabel("Tipo de obra para análise"))
+        self.analysis_work_type_filter = QComboBox()
+        self.analysis_work_type_filter.addItem("Selecione um tipo para calcular a média", None)
+        for work_type in self.store.WORK_TYPES:
+            self.analysis_work_type_filter.addItem(work_type, work_type)
+        filters.body.addWidget(self.analysis_work_type_filter)
+
+        classification = Panel(
+            "Classificar OAE selecionada",
+            "A classificação é opcional, individual e pode ser alterada depois."
+        )
+        self.analysis_classification = QComboBox()
+        self.analysis_classification.addItem("Sem classificação", None)
+        for work_type in self.store.WORK_TYPES:
+            self.analysis_classification.addItem(work_type, work_type)
+        classification.body.addWidget(self.analysis_classification)
+        save_classification = QPushButton("Salvar tipo na OAE selecionada")
+        save_classification.setObjectName("secondaryAction")
+        save_classification.clicked.connect(self._save_selected_work_type)
+        classification.body.addWidget(save_classification)
+        filters.body.addWidget(classification)
+
         buttons = QHBoxLayout()
         buttons.setSpacing(8)
         apply_button = QPushButton("Aplicar filtros")
@@ -1381,8 +1404,8 @@ class PonteMainWindow(QMainWindow):
         right = QVBoxLayout()
         right.setSpacing(12)
         indicators = Panel(
-            "Indicadores de engenharia",
-            "Valores originais importados da OAE selecionada. Não são recalculados nem consolidados."
+            "Médias dos indicadores de engenharia",
+            "Média aritmética descritiva das OAEs do tipo selecionado, após os filtros ativos."
         )
         metric_grid = QGridLayout()
         metric_grid.setHorizontalSpacing(10)
@@ -1405,19 +1428,23 @@ class PonteMainWindow(QMainWindow):
             label = QLabel(name)
             label.setObjectName("mutedSmall")
             label.setWordWrap(True)
-            value = QLabel("Selecione uma OAE")
+            value = QLabel("Selecione um tipo")
             value.setStyleSheet("font-size:12pt;font-weight:700;color:#294b67;")
             unit_label = QLabel(unit)
             unit_label.setObjectName("mutedSmall")
+            count_label = QLabel("Média não calculada")
+            count_label.setObjectName("mutedSmall")
             box.addWidget(label)
             box.addWidget(value)
             box.addWidget(unit_label)
+            box.addWidget(count_label)
             metric_grid.addWidget(card, index // 3, index % 3)
-            self.analysis_indicator_cards.append((value, field_name, decimals))
+            self.analysis_indicator_cards.append((value, field_name, decimals, count_label))
         indicators.body.addLayout(metric_grid)
         indicator_status = QLabel(
-            "Valor importado — validação técnica pendente. Ecm* é uma associação provisória "
-            "ao campo em_m3_m2 e requer confirmação da EGT."
+            "Médias descritivas, não taxas de referência de projeto. Valores ausentes não entram "
+            "como zero. Ecm* permanece associado provisoriamente ao campo em_m3_m2 e requer "
+            "confirmação da EGT."
         )
         indicator_status.setObjectName("mutedSmall")
         indicator_status.setWordWrap(True)
@@ -1463,6 +1490,7 @@ class PonteMainWindow(QMainWindow):
 
         self.analysis_project.currentIndexChanged.connect(self._refresh_analysis_tables)
         self.analysis_dataset.currentIndexChanged.connect(self._analysis_dataset_changed)
+        self.analysis_work_type_filter.currentIndexChanged.connect(self._apply_analysis_filters)
         self.analysis_search.textChanged.connect(self._apply_analysis_filters)
         self.analysis_table.itemSelectionChanged.connect(self._analysis_selection_changed)
         self._refresh_analysis_tables()
@@ -1500,7 +1528,8 @@ class PonteMainWindow(QMainWindow):
             self.analysis_table.clear()
             self.analysis_table.setRowCount(0)
             self.analysis_table.setColumnCount(0)
-            self._update_analysis_indicators(None)
+            self.analysis_classification.setCurrentIndex(0)
+            self._update_analysis_indicators([])
             for field, minimum, maximum in self.analysis_filter_rows:
                 field.blockSignals(False)
                 minimum.clear()
@@ -1509,6 +1538,8 @@ class PonteMainWindow(QMainWindow):
 
         self.analysis_columns = self.store.list_columns(table_id)
         self.analysis_records = self.store.list_records(table_id)
+        self.analysis_work_types = self.store.list_record_work_types(table_id)
+        self.analysis_classification.setCurrentIndex(0)
         unit_tokens = ("_m", "m²", "m2", "m³", "m3", "_kg", "kg_", "mm", "cm")
         excluded = {"obra", "data", "id", "identificador", "seção", "secao"}
         numeric = [
@@ -1598,7 +1629,14 @@ class PonteMainWindow(QMainWindow):
             if keep:
                 selected.append(record)
 
-        headers = [column["name"] for column in self.analysis_columns]
+        selected_type = self.analysis_work_type_filter.currentData()
+        if selected_type:
+            selected = [
+                record for record in selected
+                if self.analysis_work_types.get(record["id"]) == selected_type
+            ]
+
+        headers = [column["name"] for column in self.analysis_columns] + ["Tipo de obra"]
         self.analysis_filtered_records = selected
         self.analysis_table.setUpdatesEnabled(False)
         self.analysis_table.clear()
@@ -1606,11 +1644,15 @@ class PonteMainWindow(QMainWindow):
         self.analysis_table.setHorizontalHeaderLabels(headers)
         self.analysis_table.setRowCount(len(selected))
         for row, record in enumerate(selected):
-            for col, name in enumerate(headers):
+            for col, name in enumerate(headers[:-1]):
                 value = record["values"].get(name)
                 self.analysis_table.setItem(
                     row, col, QTableWidgetItem("—" if value is None else str(value))
                 )
+            work_type = self.analysis_work_types.get(record["id"])
+            self.analysis_table.setItem(
+                row, len(headers) - 1, QTableWidgetItem(work_type or "Não classificada")
+            )
         header = self.analysis_table.horizontalHeader()
         for col in range(len(headers)):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
@@ -1618,43 +1660,78 @@ class PonteMainWindow(QMainWindow):
         self.analysis_table.setUpdatesEnabled(True)
         message = (
             f"{len(selected)} de {len(records)} registros exibidos"
+            + (f" · tipo: {selected_type}" if selected_type else " · selecione um tipo para calcular médias")
             + (f" · {len(active_ranges)} intervalo(s) ativo(s)" if active_ranges else "")
             + (" · pesquisa textual ativa" if needle else "")
         )
         self.analysis_count.setText(message)
         self.analysis_results_count.setText(message)
+        self._update_analysis_indicators(selected if selected_type else [])
         if len(selected) == 1:
             self.analysis_table.selectRow(0)
-        else:
-            self._update_analysis_indicators(None)
 
     def _analysis_selection_changed(self):
         if not hasattr(self, "analysis_table"):
             return
         selected_rows = self.analysis_table.selectionModel().selectedRows()
         if len(selected_rows) != 1:
-            self._update_analysis_indicators(None)
+            self.analysis_classification.setCurrentIndex(0)
             return
         row = selected_rows[0].row()
         records = getattr(self, "analysis_filtered_records", [])
         if row < 0 or row >= len(records):
-            self._update_analysis_indicators(None)
+            self.analysis_classification.setCurrentIndex(0)
             return
-        self._update_analysis_indicators(records[row]["values"])
+        record_id = records[row]["id"]
+        work_type = self.analysis_work_types.get(record_id)
+        index = self.analysis_classification.findData(work_type)
+        self.analysis_classification.setCurrentIndex(max(0, index))
 
-    def _update_analysis_indicators(self, values):
+    def _save_selected_work_type(self):
+        if not hasattr(self, "analysis_table") or self.analysis_dataset.currentData() is None:
+            QMessageBox.information(self, "Classificar OAE", "Selecione um conjunto de dados.")
+            return
+        selected_rows = self.analysis_table.selectionModel().selectedRows()
+        if len(selected_rows) != 1:
+            QMessageBox.information(self, "Classificar OAE", "Selecione uma OAE na tabela.")
+            return
+        row = selected_rows[0].row()
+        if row < 0 or row >= len(self.analysis_filtered_records):
+            return
+        record_id = self.analysis_filtered_records[row]["id"]
+        work_type = self.analysis_classification.currentData()
+        try:
+            self.store.set_record_work_type(record_id, work_type)
+        except Exception as exc:
+            QMessageBox.warning(self, "Não foi possível salvar", str(exc))
+            return
+        self.analysis_work_types = self.store.list_record_work_types(
+            self.analysis_dataset.currentData()
+        )
+        self._apply_analysis_filters()
+
+    def _update_analysis_indicators(self, records):
         if not hasattr(self, "analysis_indicator_cards"):
             return
-        for value_label, field_name, decimals in self.analysis_indicator_cards:
-            raw_value = self._pick_value(values, field_name) if values is not None else None
-            number = self._analysis_number(raw_value)
-            if raw_value is None or str(raw_value).strip() == "":
-                display = "Dado ausente" if values is not None else "Selecione uma OAE"
-            elif number is None:
-                display = str(raw_value)
+        records = records or []
+        for value_label, field_name, decimals, count_label in self.analysis_indicator_cards:
+            valid = [
+                number for record in records
+                if (number := self._analysis_number(record["values"].get(field_name))) is not None
+            ]
+            missing = len(records) - len(valid)
+            if valid:
+                mean = sum(valid) / len(valid)
+                display = f"{mean:,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                count_text = f"N = {len(valid)} OAEs · {missing} ausente(s)"
+            elif records:
+                display = "Sem dados válidos"
+                count_text = f"N = 0 · {missing} ausente(s)"
             else:
-                display = f"{number:,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                display = "Selecione um tipo"
+                count_text = "Média não calculada"
             value_label.setText(display)
+            count_label.setText(count_text)
 
     def _reports_page(self) -> QWidget:
         """Report catalog layout; generation stays disabled until validated data exists."""
