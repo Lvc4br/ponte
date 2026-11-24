@@ -1,84 +1,55 @@
-# PONTE — Banco Central de Dados de Engenharia | EGT
+# EGT — Gerenciador de Estruturas
 
-> **Direção do rebuild:** aplicação desktop para a EGT, com API central e PostgreSQL, iniciando pelo domínio de pontes/OAE e preparada para 30+ usuários simultâneos.
+Aplicativo desktop Windows para organizar projetos, tabelas, registros técnicos e documentos. Esta branch contém a entrega desktop local do EGT.
 
-A documentação oficial desta nova direção está em [docs/EGT](docs/EGT/README.md). Ela define visão de produto, arquitetura de implantação, modelo de dados, plano de desenvolvimento e política de limpeza do repositório. O processo da entrega desktop em arquivo único está em [Entrega desktop — One File](docs/EGT/ENTREGA_DESKTOP_ONEFILE.md).
+<badge>Projeto concluído — manutenção e atualizações</badge>
 
-**Atenção:** o código existente neste branch é a base legada em avaliação. Ele não deve ser considerado a arquitetura final do rebuild. A nova aplicação será construída em etapas, mantendo o sistema e os dados anteriores preservados até a validação da migração.
+## Situação da versão
 
-## Decisões do rebuild
-- Cliente: desktop Python/PySide6.
-- Comunicação: cliente desktop → API central (FastAPI) → PostgreSQL.
-- Concorrência alvo: 30+ usuários, validada por teste de carga.
-- Domínio inicial: pontes e obras de arte especiais.
-- Documentos: metadados relacionais e binários em armazenamento corporativo.
-- Segurança: autenticação, autorização no servidor e auditoria.
+A entrega inicial do aplicativo desktop está concluída. A partir desta versão, o projeto entra em manutenção: as próximas publicações serão atualizações, correções, ajustes de compatibilidade, segurança e melhorias pontuais.
 
-## Entrega desktop Windows\n\nEsta branch prepara o empacotamento como **um único arquivo PONTE.exe** (PyInstaller One File). Consulte [Instalação Windows](docs/INSTALACAO_WINDOWS.md). O executável gerado ainda precisa passar pelos testes em máquina Windows limpa antes de ser considerado liberado. A versão local usa SQLite e não é ainda o banco central multiusuário da EGT.\n\n## Documentação legada
+- Aplicativo distribuído em um único arquivo: `EGT.exe`.
+- Empacotamento: PyInstaller One File.
+- Persistência local: SQLite.
+- Os dados ficam fora do executável, na pasta `data`, criada pela aplicação quando necessário.
+- O executável de distribuição não inclui banco de dados nem registros pessoais.
+- Esta entrega é local e não representa ainda a arquitetura central multiusuário com API e PostgreSQL.
 
-# Gerenciador de Estruturas
+## Download
 
-Aplicativo desktop para gerenciamento de projetos, tabelas, dados técnicos e documentos, com foco em fluxos de trabalho de engenharia. O nome PONTE permanece como origem histórica do projeto; a aplicação não fica limitada a pontes.
+O executável deve ser publicado como ativo de uma versão na página [Releases](https://github.com/Lvc4br/ponte/releases). Por seu tamanho, o arquivo `EGT.exe` deve ser anexado à Release, e não versionado diretamente no histórico normal do Git.
 
-## Interface atual
+## Instalação
 
-A interface principal utiliza três colunas:
+1. Baixe `EGT.exe` na seção Releases.
+2. Salve-o em uma pasta na qual seu usuário tenha permissão de gravação.
+3. Execute o arquivo.
+4. Na primeira execução, a aplicação deverá preparar a pasta `data` e o banco SQLite local.
 
-- **Filtros técnicos:** tipo de obra, largura, vão e comprimento, com aplicação combinada dos critérios.
-- **Planilha:** edição de células, seleção, ordenação, filtros por coluna, pesquisa, colunas calculadas, desfazer/refazer e operações em lote.
-- **Resumo e propriedades:** estatísticas recalculadas sobre os registros efetivamente exibidos e detalhes da linha selecionada.
+## Atualizações e preservação dos dados
 
-A área de documentos fica em um painel inferior recolhível. A barra superior concentra seleção de projeto/tabela e ações mais frequentes; ferramentas secundárias ficam agrupadas no menu Ferramentas.
+1. Feche o EGT.
+2. Faça uma cópia de segurança da pasta `data`.
+3. Substitua somente o `EGT.exe` pela versão nova.
+4. Abra o aplicativo e confira os dados.
 
-## Recursos preservados
+**Não apague nem substitua a pasta `data` durante uma atualização.** O executável e o banco de dados são itens separados.
 
-- Projetos e múltiplas tabelas por projeto.
-- Colunas dinâmicas, validação de tipos e fórmulas seguras.
-- Filtros técnicos, filtros por coluna, condições, pesquisa e ordenação.
-- Edição de células, copiar/colar, histórico de desfazer/refazer e edição em lote.
-- Importação e exportação Excel.
-- Catálogo documental, vínculo de documentos, análise de arquivos e pré-visualização de PDF.
-- Persistência local SQLite e recursos de backup/recuperação existentes.
+## Verificações realizadas
 
-## Estatísticas
+- Inicialização do executável empacotado e abertura da janela principal.
+- Fechamento normal do aplicativo.
+- Verificação de integridade do banco SQLite local: `ok`.
+- Teste local de persistência dos dados após reabrir o aplicativo.
 
-Os indicadores são calculados sobre o mesmo conjunto filtrado apresentado na planilha. Valores vazios ou não numéricos são excluídos do cálculo e a quantidade de valores válidos é exibida. Para campos que armazenem intervalos como texto, é necessário normalizar os dados antes de tratá-los como uma medida numérica única.
-
-## Instalação e execução (Windows)
-
-Requisitos: Python 3.11 ou superior.
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m compileall -q app tests main.py
-.\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe main.py
-```
-
-Para gerar o executável, execute `build/build_windows.bat`. O pipeline do GitHub Actions valida o código e gera o pacote Windows.
-
-## Estrutura do repositório
-
-- `app/`: aplicação, interface, serviços, armazenamento e importação/exportação.
-- `database/`: documentação e exemplo de estrutura de banco; não contém dados reais de clientes.
-- `docs/`: arquitetura, instalação, status e plano de testes.
-- `build/`: scripts de empacotamento.
-- `tests/`: testes automatizados.
-- `.github/`: CI e automações do repositório.
-
-## Segurança e preservação de dados
-
-- Não versionar bancos locais, planilhas internas, documentos corporativos, credenciais ou dados pessoais.
-- Faça backup do banco SQLite antes de atualizar uma instalação existente.
-- O scanner não certifica documentos nem substitui a validação de engenharia.
-- Macros VBA e conteúdo ativo não são executados.
-- A base legada deve permanecer preservada durante a evolução.
+Ainda não foi comprovada a execução em uma máquina Windows limpa, sem Python, nem o primeiro arranque do executável em uma pasta totalmente vazia. Esses pontos devem ser validados antes de tratar a distribuição como universalmente testada.
 
 ## Documentação
 
-- [Arquitetura](docs/ARQUITETURA_GERENCIADOR_UNIVERSAL.md)
-- [Instalação Windows](docs/INSTALACAO_WINDOWS.md)
-- [Plano de testes de usuário](docs/PLANO_TESTES_USUARIO.md)
-- [Status do projeto](docs/STATUS_PROJETO.md)
+- [Entrega desktop e procedimento de atualização](docs/EGT/ENTREGA_DESKTOP_ONEFILE.md)
+- [Visão geral da EGT](docs/EGT/README.md)
+- [Arquitetura de implantação](docs/EGT/ARQUITETURA_IMPLANTACAO.md)
+
+## Segurança
+
+Não publique bancos SQLite de usuários, planilhas internas, documentos corporativos, credenciais ou dados pessoais. O executável atual não possui assinatura Authenticode; o Windows pode exibir avisos de reputação ao executá-lo.
