@@ -25,6 +25,7 @@ from app.workspace.store import WorkspaceStore
 from app.workspace.exchange import SpreadsheetExchange
 from app.data.dataset_store import DEFAULT_STORE, DatasetStore
 from app.core.bridge_formatters import bridge_span_text
+from app.core.models import BridgeRecord
 
 
 NAV_ITEMS = [
@@ -475,24 +476,62 @@ class PonteMainWindow(QMainWindow):
 
     def _projects_page(self) -> QWidget:
         page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 8, 8)
+        layout.setSpacing(14)
+
         intro = QLabel(
-            "Pesquise, filtre e acompanhe empreendimentos e contratos aos quais as OAEs estão vinculadas."
+            "Pesquise, filtre e acompanhe empreendimentos e contratos, com contagem das "
+            "estruturas identificadas nas tabelas importadas."
         )
         intro.setObjectName("sectionIntro")
         intro.setWordWrap(True)
         layout.addWidget(intro)
-        self.project_rows = self.store.list_projects()
-        cards = self._metric_row([
-            MetricCard("Projetos cadastrados", str(len(self.project_rows)), "Registros no workspace local"),
-            MetricCard("OAEs vinculadas", "Não apurado", "Relacionamento projeto–OAE ainda não integrado"),
-            MetricCard("Em execução", "Não apurado", "Etapas não estruturadas no cadastro atual"),
-            MetricCard("Com pendências", "Não apurado", "Validação de empreendimentos ainda não integrada"),
-        ])
-        layout.addWidget(cards)
 
-        panel = Panel("Empreendimentos cadastrados", "Dados locais • campos não cadastrados permanecem como “Não informado”")
+        self.project_rows = self.store.list_projects()
+        datasets = self._workspace_datasets()
+        stats_by_project = {}
+        for project in self.project_rows:
+            linked = [item for item in datasets if item["project"]["id"] == project["id"]]
+            identifiers = set()
+            has_pending = False
+            for dataset in linked:
+                quality = self._dataset_quality(dataset)
+                for record in dataset["records"]:
+                    identifier = self._pick_value(
+                        record["values"], "obra", "identificador", "codigo_oae",
+                        "código_oae", "id_oae", "oae"
+                    )
+                    if self._filled(identifier):
+                        identifiers.add(str(identifier).strip())
+                if (quality["missing_geometry"] or 0) > 0 or quality["typology"] < quality["records"]:
+                    has_pending = True
+            stats_by_project[project["id"]] = {
+                "oae_count": len(identifiers), "pending": has_pending
+            }
+
+        linked_total = sum(item["oae_count"] for item in stats_by_project.values())
+        execution_total = sum(
+            1 for project in self.project_rows
+            if "exec" in str((project.get("metadata") or {}).get(
+                "stage", (project.get("metadata") or {}).get("etapa", "")
+            )).casefold()
+        )
+        pending_total = sum(1 for item in stats_by_project.values() if item["pending"])
+        layout.addWidget(self._metric_row([
+            MetricCard("Projetos cadastrados", str(len(self.project_rows)), "Registros no workspace local"),
+            MetricCard("OAEs identificadas", str(linked_total), "Identificadores distintos na coluna obra/código"),
+            MetricCard("Em execução", str(execution_total), "Etapa explicitamente marcada como execução"),
+            MetricCard("Com pendências", str(pending_total), "Projetos com tipologia ou geometria ausente", "#c58b3e"),
+        ]))
+
+        panel = Panel("Empreendimentos cadastrados", "Metadados do projeto e informações derivadas das tabelas vinculadas")
         toolbar = QHBoxLayout()
         self.project_search = QLineEdit()
         self.project_search.setPlaceholderText("Buscar projeto, contrato ou responsável…")
@@ -502,14 +541,12 @@ class PonteMainWindow(QMainWindow):
         self.project_status_filter.addItem("Todos os status", "")
         self.project_responsible_filter = QComboBox()
         self.project_responsible_filter.addItem("Todos os responsáveis", "")
-        statuses = set()
-        responsibles = set()
+        statuses, responsibles = set(), set()
         for project in self.project_rows:
             metadata = project.get("metadata") or {}
-            status = metadata.get("status")
+            if metadata.get("status"):
+                statuses.add(str(metadata["status"]))
             responsible = metadata.get("responsible", metadata.get("responsavel"))
-            if status:
-                statuses.add(str(status))
             if responsible:
                 responsibles.add(str(responsible))
         for value in sorted(statuses, key=str.casefold):
@@ -532,26 +569,37 @@ class PonteMainWindow(QMainWindow):
         ])
         self.project_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.project_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.project_table.setAlternatingRowColors(True)
         self.project_table.verticalHeader().setVisible(False)
+        self.project_table.setMinimumHeight(220)
         self.project_table.horizontalHeader().setStretchLastSection(True)
         for row, project in enumerate(self.project_rows):
             metadata = project.get("metadata") or {}
-            oae_count = metadata.get("oae_count", metadata.get("oaes"))
+            stats = stats_by_project[project["id"]]
+            status = metadata.get("status")
+            if not status and stats["pending"]:
+                status = "Pendente de validação"
             values = [
                 project.get("name"),
                 metadata.get("location", metadata.get("local")),
-                oae_count,
+                stats["oae_count"] if stats["oae_count"] else "Não identificadas",
                 metadata.get("stage", metadata.get("etapa")),
                 metadata.get("responsible", metadata.get("responsavel")),
-                metadata.get("status"),
+                status,
             ]
             for col, value in enumerate(values):
                 self.project_table.setItem(
-                    row, col, QTableWidgetItem("Não informado" if value is None else str(value))
+                    row, col, QTableWidgetItem(
+                        "Não informado" if value is None or value == "" else str(value)
+                    )
                 )
         panel.body.addWidget(self.project_table, 1)
         layout.addWidget(panel, 1)
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
         return page
+
+
 
     def _filter_project_rows(self, *_):
         if not hasattr(self, "project_table"):
@@ -584,106 +632,174 @@ class PonteMainWindow(QMainWindow):
             QMessageBox.warning(self, "Não foi possível criar o projeto", str(exc))
 
     def _bridges_page(self) -> QWidget:
-        """Show legacy bridge records without inventing or rewriting technical values."""
+        """Display workspace-imported rows in the OAE source register without false approvals."""
         page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 8, 8)
+        layout.setSpacing(12)
+
         intro = QLabel(
-            "Consulte os registros de pontes e OAEs importados. Os valores permanecem "
-            "vinculados à sua origem e não são tratados como validados."
+            "Consulte as estruturas identificadas nas tabelas importadas. A ficha organiza "
+            "os campos disponíveis na origem sem alterar valores ou declarar validação técnica."
         )
         intro.setObjectName("sectionIntro")
         intro.setWordWrap(True)
         layout.addWidget(intro)
 
-        try:
-            self.bridge_records = DatasetStore().load()
-            load_error = None
-        except Exception:
-            self.bridge_records = []
-            load_error = "Não foi possível carregar os registros locais. Verifique a base de dados."
+        source = Panel("Origem dos registros", "Selecione o projeto e a tabela importada")
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Projeto"))
+        self.bridge_project_combo = QComboBox()
+        for project in self.store.list_projects():
+            self.bridge_project_combo.addItem(project["name"], project["id"])
+        row.addWidget(self.bridge_project_combo, 1)
+        row.addWidget(QLabel("Conjunto"))
+        self.bridge_dataset_combo = QComboBox()
+        row.addWidget(self.bridge_dataset_combo, 2)
+        source.body.addLayout(row)
+        layout.addWidget(source)
 
-        summary = self._metric_row([
-            MetricCard("Registros de origem", str(len(self.bridge_records)),
-                       "Linhas armazenadas no conjunto local"),
-            MetricCard("Com tipologia", str(sum(bool(r.get("tipo_obra")) for r in self.bridge_records)),
-                       "Campo informado na origem"),
-            MetricCard("Com geometria", str(sum(
-                r.get("compr_obra_m") is not None and r.get("largura_m") is not None
-                for r in self.bridge_records
-            )), "Comprimento e largura presentes"),
-            MetricCard("Validação técnica", "Pendente",
-                       "Cadastro e aprovação de engenharia ainda não integrados", "#c58b37"),
+        self.bridge_summary = self._metric_row([
+            MetricCard("Registros de origem", "0", "Linhas da tabela selecionada"),
+            MetricCard("Com tipologia", "0", "Campo de tipologia preenchido"),
+            MetricCard("Com geometria", "0", "Comprimento e largura preenchidos"),
+            MetricCard("Validação técnica", "Pendente", "Aprovação de engenharia não integrada", "#c58b37"),
         ])
-        layout.addWidget(summary)
+        layout.addWidget(self.bridge_summary)
 
-        listing = Panel("Pontes e OAEs", "Registros importados • consulta da base local")
+        listing = Panel("Pontes e OAEs", "Registros importados • consulta somente leitura")
         self.bridge_search = QLineEdit()
-        self.bridge_search.setPlaceholderText("Buscar por código, tipologia ou valor de origem…")
+        self.bridge_search.setPlaceholderText("Buscar por identificador, tipologia ou valor de origem…")
         self.bridge_search.textChanged.connect(self._filter_bridge_records)
         listing.body.addWidget(self.bridge_search)
-        self.bridge_table = QTableWidget(len(self.bridge_records), 5)
+        self.bridge_table = QTableWidget(0, 5)
         self.bridge_table.setHorizontalHeaderLabels([
-            "Identificador", "Tipologia", "Comprimento (m)", "Largura (m)", "Vãos (m)"
+            "Identificador", "Tipologia", "Comprimento (m)", "Largura (m)", "Vãos"
         ])
         self.bridge_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.bridge_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.bridge_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.bridge_table.setAlternatingRowColors(True)
         self.bridge_table.verticalHeader().setVisible(False)
+        self.bridge_table.setMinimumHeight(230)
         self.bridge_table.horizontalHeader().setStretchLastSection(True)
-        for row, record in enumerate(self.bridge_records):
-            values = [
-                record.get("obra", record.source_row),
-                record.get("tipo_obra"),
-                record.get("compr_obra_m"),
-                record.get("largura_m"),
-                self._bridge_span_text(record.values),
-            ]
-            for col, value in enumerate(values):
-                self.bridge_table.setItem(
-                    row, col, QTableWidgetItem("Não informado" if value is None else str(value))
-                )
         self.bridge_table.itemSelectionChanged.connect(self._show_selected_bridge_record)
         listing.body.addWidget(self.bridge_table, 1)
         layout.addWidget(listing, 2)
 
-        detail = Panel("Ficha técnica da OAE", "Consulta dos campos disponíveis no registro de origem • somente leitura")
+        detail = Panel("Ficha técnica da OAE", "Campos de origem organizados por aba • sem aprovação técnica automática")
         self.bridge_tabs = QTabWidget()
         self.bridge_tab_labels = {}
-        empty_message = load_error or (
-            "Nenhum registro legado de ponte/OAE foi encontrado nesta base. "
-            "A importação genérica atual ainda não mapeia planilhas para o cadastro técnico de OAE."
-            if not self.bridge_records else
-            "Selecione uma linha acima. Campos ausentes serão exibidos como “Não informado”."
-        )
         for key, title in [
-            ("identification", "Identificação"),
-            ("geometry", "Geometria"),
-            ("quantities", "Materiais e quantitativos"),
-            ("inspections", "Inspeções"),
-            ("documents", "Documentos"),
-            ("history", "Histórico"),
+            ("identification", "Identificação"), ("geometry", "Geometria"),
+            ("quantities", "Materiais e quantitativos"), ("inspections", "Inspeções"),
+            ("documents", "Documentos"), ("history", "Histórico"),
         ]:
-            tab_label = QLabel(empty_message)
-            tab_label.setWordWrap(True)
-            tab_label.setObjectName("sectionIntro")
-            tab_label.setContentsMargins(12, 12, 12, 12)
-            self.bridge_tab_labels[key] = tab_label
-            self.bridge_tabs.addTab(tab_label, title)
+            label = QLabel("Selecione um registro para consultar os campos disponíveis.")
+            label.setWordWrap(True)
+            label.setObjectName("sectionIntro")
+            label.setContentsMargins(12, 12, 12, 12)
+            self.bridge_tab_labels[key] = label
+            self.bridge_tabs.addTab(label, title)
         detail.body.addWidget(self.bridge_tabs)
         layout.addWidget(detail, 1)
 
-        if load_error:
-            self.bridge_table.setEnabled(False)
-        elif self.bridge_records:
-            self.bridge_table.selectRow(0)
+        self.bridge_project_combo.currentIndexChanged.connect(self._refresh_bridge_tables)
+        self.bridge_dataset_combo.currentIndexChanged.connect(self._bridge_dataset_changed)
+        self._refresh_bridge_tables()
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
         return page
+
+    def _refresh_bridge_tables(self, *_):
+        if not hasattr(self, "bridge_dataset_combo"):
+            return
+        self.bridge_dataset_combo.blockSignals(True)
+        self.bridge_dataset_combo.clear()
+        project_id = self.bridge_project_combo.currentData()
+        if project_id is not None:
+            tables = self.store.list_tables(project_id)
+            tables.sort(key=lambda item: (
+                0 if item["name"].strip().casefold() == "base_limpa" else 1,
+                item["name"].casefold(),
+            ))
+            for table in tables:
+                count = len(self.store.list_records(table["id"]))
+                self.bridge_dataset_combo.addItem(f'{table["name"]} · {count} registros', table["id"])
+        self.bridge_dataset_combo.blockSignals(False)
+        self._bridge_dataset_changed()
+
+    def _bridge_dataset_changed(self, *_):
+        if not hasattr(self, "bridge_table"):
+            return
+        table_id = self.bridge_dataset_combo.currentData()
+        self.bridge_table.setRowCount(0)
+        if table_id is None:
+            self.bridge_records = []
+            self._set_bridge_summary(0, 0, 0)
+            for label in self.bridge_tab_labels.values():
+                label.setText("Este projeto ainda não possui tabelas importadas.")
+            return
+        project_id = self.bridge_project_combo.currentData()
+        table = next((item for item in self.store.list_tables(project_id) if item["id"] == table_id), None)
+        rows = self.store.list_records(table_id)
+        self.bridge_records = [
+            BridgeRecord(record["values"], record["id"], None, table["name"] if table else None)
+            for record in rows
+        ]
+        quality = self._dataset_quality({
+            "records": rows,
+            "columns": self.store.list_columns(table_id),
+        })
+        self._set_bridge_summary(quality["records"], quality["typology"], quality["geometry"])
+        self.bridge_table.setRowCount(len(self.bridge_records))
+        for row_index, record in enumerate(self.bridge_records):
+            values = [
+                self._pick_value(record.values, "obra", "identificador", "codigo_oae", "código_oae", "id_oae", "oae"),
+                self._pick_value(record.values, "tipo_obra", "tipologia", "tipologia_obra", "tipo"),
+                self._pick_value(record.values, "compr_obra_m", "comprimento_total_m", "comprimento_m"),
+                self._pick_value(record.values, "largura_m", "largura_tabuleiro_m", "largura"),
+                self._bridge_span_text(record.values),
+            ]
+            for col, value in enumerate(values):
+                self.bridge_table.setItem(
+                    row_index, col,
+                    QTableWidgetItem("Não informado" if not self._filled(value) else str(value))
+                )
+        self.bridge_table.resizeColumnsToContents()
+        if self.bridge_records:
+            self.bridge_table.selectRow(0)
+
+    def _set_bridge_summary(self, total, typology, geometry):
+        old = self.bridge_summary
+        parent_layout = old.parentWidget().layout()
+        index = parent_layout.indexOf(old)
+        parent_layout.removeWidget(old)
+        old.deleteLater()
+        self.bridge_summary = self._metric_row([
+            MetricCard("Registros de origem", str(total), "Linhas da tabela selecionada"),
+            MetricCard("Com tipologia", str(typology), "Campo de tipologia preenchido"),
+            MetricCard("Com geometria", str(geometry), "Comprimento e largura preenchidos"),
+            MetricCard("Validação técnica", "Pendente", "Aprovação de engenharia não integrada", "#c58b37"),
+        ])
+        parent_layout.insertWidget(index, self.bridge_summary)
 
     @staticmethod
     def _bridge_span_text(values: dict) -> str:
+        direct = values.get("vão_m", values.get("vao_m", values.get("vão_total_m", values.get("vao_total_m"))))
+        if direct not in (None, ""):
+            return str(direct)
         return bridge_span_text(values)
 
-    def _filter_bridge_records(self, query: str):
+    def _filter_bridge_records(self, query: str = ""):
+        if not hasattr(self, "bridge_table"):
+            return
         needle = query.strip().casefold()
         for row in range(self.bridge_table.rowCount()):
             text_value = " ".join(
@@ -694,83 +810,66 @@ class PonteMainWindow(QMainWindow):
             self.bridge_table.setRowHidden(row, bool(needle) and needle not in text_value)
 
     def _show_selected_bridge_record(self):
+        if not hasattr(self, "bridge_table"):
+            return
         selected = self.bridge_table.selectionModel().selectedRows()
         if not selected:
             return
         row = selected[0].row()
+        if row >= len(self.bridge_records):
+            return
         record = self.bridge_records[row]
-        fields = [
-            ("Identificador", record.get("obra", record.source_row)),
-            ("Tipologia", record.get("tipo_obra")),
-            ("Seção", record.get("secao")),
-            ("Largura do tabuleiro", record.get("largura_m"), "m"),
-            ("Vão mínimo", record.get("vao_min_m", record.get("vão_min_m")), "m"),
-            ("Vão máximo", record.get("vao_max_m", record.get("vão_max_m")), "m"),
-            ("Comprimento total", record.get("compr_obra_m"), "m"),
-            ("Ecm (campo da origem; unidade provisória)", record.get("em_m3_m2"), "m³/m²"),
-            ("Paf", record.get("Paf_kg_m2"), "kg/m²"),
-            ("Pap", record.get("Pap_kg_m2"), "kg/m²"),
-            ("Af", record.get("Af_m2_m2"), "m²/m²"),
-            ("anc_at_pas (campo original; significado a confirmar)", record.get("anc_at_pas")),
-        ]
-        parts = []
-        for item in fields:
-            label, value, *unit = item
-            rendered = "Não informado" if value is None else str(value)
-            if unit and value is not None:
-                rendered = f"{rendered} {unit[0]}"
-            parts.append(f"{label}: {rendered}")
-        source = f"Origem: {record.source_file or 'base local'}"
-        if record.source_sheet:
-            source += f" • Aba: {record.source_sheet}"
-        source += f" • Linha de origem: {record.source_row}"
-        identity_fields = [
-            ("Identificador", record.get("obra", record.source_row)),
-            ("Nome da estrutura", record.get("nome", record.get("obra_nome"))),
-            ("Projeto", record.get("projeto")),
-            ("Tipologia", record.get("tipo_obra")),
-            ("Município / UF", record.get("municipio")),
-            ("Rodovia / km", record.get("rodovia")),
-            ("Latitude", record.get("latitude")),
-            ("Longitude", record.get("longitude")),
-        ]
-        geometry_fields = [
-            ("Comprimento total", record.get("compr_obra_m"), "m"),
-            ("Largura do tabuleiro", record.get("largura_m"), "m"),
-            ("Vão mínimo", record.get("vao_min_m", record.get("vão_min_m")), "m"),
-            ("Vão máximo", record.get("vao_max_m", record.get("vão_max_m")), "m"),
-            ("Seção", record.get("secao")),
-            ("Altura de viga/laje", record.get("hviga_laje_m")),
-        ]
+        values = record.values
 
         def render(items):
             lines = []
-            for item in items:
-                label, value, *unit = item
-                rendered = "Não informado" if value is None else str(value)
-                if unit and value is not None:
-                    rendered = f"{rendered} {unit[0]}"
-                lines.append(f"{label}: {rendered}")
+            for label, value, *unit in items:
+                shown = "Não informado" if not self._filled(value) else str(value)
+                if unit and self._filled(value):
+                    shown += f" {unit[0]}"
+                lines.append(f"{label}: {shown}")
             return "\n".join(lines)
 
-        self.bridge_tab_labels["identification"].setText(
-            render(identity_fields) + "\n\nEstado cadastral: não validado."
-        )
-        self.bridge_tab_labels["geometry"].setText(
-            render(geometry_fields) + "\n\nMedidas exibidas conforme os campos de origem."
-        )
+        identity = [
+            ("Identificador", self._pick_value(values, "obra", "identificador", "codigo_oae", "código_oae", "id_oae", "oae")),
+            ("Nome da estrutura", self._pick_value(values, "nome", "obra_nome", "nome_estrutura")),
+            ("Projeto", self._pick_value(values, "projeto", "contrato")),
+            ("Tipologia", self._pick_value(values, "tipo_obra", "tipologia", "tipologia_obra", "tipo")),
+            ("Município / UF", self._pick_value(values, "municipio", "município", "local")),
+            ("Rodovia / km", self._pick_value(values, "rodovia", "rodovia_km", "km")),
+            ("Latitude", self._pick_value(values, "latitude")),
+            ("Longitude", self._pick_value(values, "longitude")),
+        ]
+        geometry = [
+            ("Comprimento total", self._pick_value(values, "compr_obra_m", "comprimento_total_m", "comprimento_m"), "m"),
+            ("Largura do tabuleiro", self._pick_value(values, "largura_m", "largura_tabuleiro_m", "largura"), "m"),
+            ("Vão", self._pick_value(values, "vão_m", "vao_m", "vão_total_m", "vao_total_m"), "m"),
+            ("Vão mínimo", self._pick_value(values, "vão_min_m", "vao_min_m"), "m"),
+            ("Vão máximo", self._pick_value(values, "vão_max_m", "vao_max_m"), "m"),
+            ("Seção", self._pick_value(values, "seção", "secao")),
+            ("Altura de viga/laje", self._pick_value(values, "hviga_laje_m"), "m"),
+        ]
+        quantities = [
+            ("Ecm (campo da origem; unidade a confirmar)", self._pick_value(values, "em_m3_m2")),
+            ("Paf", self._pick_value(values, "Paf_kg_m2"), "kg/m²"),
+            ("Pap", self._pick_value(values, "Pap_kg_m2"), "kg/m²"),
+            ("Af", self._pick_value(values, "Af_m2_m2"), "m²/m²"),
+        ]
+        self.bridge_tab_labels["identification"].setText(render(identity) + "\n\nEstado cadastral: não validado.")
+        self.bridge_tab_labels["geometry"].setText(render(geometry) + "\n\nValores conforme armazenados na tabela.")
         self.bridge_tab_labels["quantities"].setText(
-            render(fields[7:]) + "\n\nDefinições e fórmulas dos indicadores ainda dependem de aprovação da engenharia."
+            render(quantities) + "\n\nDefinições, unidades e fórmulas dependem de aprovação formal da EGT."
         )
-        pending = "Módulo ainda não integrado ao cadastro OAE."
-        self.bridge_tab_labels["inspections"].setText(pending)
-        self.bridge_tab_labels["documents"].setText(
-            "Vínculo documental específico da OAE ainda não integrado.\n" + pending
-        )
+        self.bridge_tab_labels["inspections"].setText("Não há registros de inspeção vinculados a esta linha.")
+        self.bridge_tab_labels["documents"].setText("Não há vínculo documental por OAE registrado para esta linha.")
         self.bridge_tab_labels["history"].setText(
-            source + f"\n\nID interno do registro: {record.source_row}\n"
-            "Histórico de alterações e trilha de auditoria ainda não integrados."
+            f"Projeto: {self.bridge_project_combo.currentText()}\n"
+            f"Tabela: {record.source_sheet or 'não identificada'}\n"
+            f"ID interno: {record.source_row}\n"
+            "O nome do arquivo original e a linha da planilha não foram preservados no registro genérico."
         )
+
+
 
     def _import_page(self) -> QWidget:
         """Import page matching the approved PDF: upload area, five vertical steps and integrity note."""
