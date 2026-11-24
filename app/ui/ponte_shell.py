@@ -12,15 +12,15 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QInputDialog,
-    QLabel, QMainWindow, QMessageBox, QPushButton, QStackedWidget,
-    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QScrollArea,
-    QComboBox, QLineEdit, QFileDialog, QTabWidget,
+    QAbstractItemView, QDialog, QDialogButtonBox, QFrame, QGridLayout,
+    QHBoxLayout, QInputDialog, QLabel, QMainWindow, QMessageBox,
+    QPushButton, QStackedWidget, QTableWidget, QTableWidgetItem,
+    QVBoxLayout, QWidget, QScrollArea, QComboBox, QLineEdit,
+    QFileDialog, QTabWidget,
 )
 
 from app.documents.index import DocumentIndex
 from app.documents.scanner import DocumentScanner
-from app.ui.engineering_workspace import EngineeringWorkspaceWindow
 from app.workspace.store import WorkspaceStore
 from app.workspace.exchange import SpreadsheetExchange
 from app.data.dataset_store import DEFAULT_STORE, DatasetStore
@@ -114,7 +114,6 @@ class PonteMainWindow(QMainWindow):
 
         self.store = WorkspaceStore()
         self.documents = DocumentIndex()
-        self.legacy_window = None
         self.pages: dict[str, QWidget] = {}
         self.nav_buttons: dict[str, QPushButton] = {}
 
@@ -686,7 +685,7 @@ class PonteMainWindow(QMainWindow):
         management_row.addStretch(1)
         manage_tables = QPushButton("Gerenciar tabelas existentes")
         manage_tables.setObjectName("secondaryAction")
-        manage_tables.clicked.connect(self.open_spreadsheet_workspace)
+        manage_tables.clicked.connect(self.manage_tables)
         management_row.addWidget(manage_tables)
         layout.addLayout(management_row)
 
@@ -981,15 +980,6 @@ class PonteMainWindow(QMainWindow):
             "Os dados foram gravados no workspace local.\n"
             "O arquivo de origem permaneceu no local original.",
         )
-        open_workspace = QMessageBox.question(
-            self,
-            "Consultar dados importados",
-            "Deseja abrir a ferramenta auxiliar de planilhas para consultar os registros?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes,
-        )
-        if open_workspace == QMessageBox.StandardButton.Yes:
-            self.open_spreadsheet_workspace()
 
     @staticmethod
     def _format_sheet_preview(sheets):
@@ -1408,16 +1398,131 @@ class PonteMainWindow(QMainWindow):
         layout.addStretch(1)
         return page
 
-    def open_spreadsheet_workspace(self):
-        """Open the spreadsheet editor as an auxiliary tool, not as a PONTE module page."""
-        if self.legacy_window is None:
-            self.legacy_window = EngineeringWorkspaceWindow()
-            self.legacy_window.setWindowTitle(
-                "PONTE | Ferramenta auxiliar de planilhas"
+    def manage_tables(self):
+        """Manage imported tables inside the current PONTE interface."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Gerenciar tabelas")
+        dialog.setMinimumSize(720, 470)
+        dialog.setModal(True)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(22, 20, 22, 18)
+        layout.setSpacing(12)
+
+        title = QLabel("Tabelas do projeto")
+        title.setStyleSheet("font-size:16pt;font-weight:700;color:#26384b;")
+        description = QLabel(
+            "Consulte, renomeie ou exclua tabelas importadas. "
+            "A exclusão remove também os registros e as colunas daquela tabela."
+        )
+        description.setWordWrap(True)
+        description.setObjectName("muted")
+        layout.addWidget(title)
+        layout.addWidget(description)
+
+        project_row = QHBoxLayout()
+        project_row.addWidget(QLabel("Projeto"))
+        project_combo = QComboBox()
+        projects = self.store.list_projects()
+        for project in projects:
+            project_combo.addItem(project["name"], project["id"])
+        project_row.addWidget(project_combo, 1)
+        layout.addLayout(project_row)
+
+        table = QTableWidget(0, 3)
+        table.setHorizontalHeaderLabels(["Nome da tabela", "Registros", "Atualizada em"])
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setStretchLastSection(True)
+        table.setAlternatingRowColors(True)
+        layout.addWidget(table, 1)
+
+        actions = QHBoxLayout()
+        rename_button = QPushButton("Renomear")
+        delete_button = QPushButton("Excluir tabela")
+        delete_button.setStyleSheet(
+            "QPushButton {color:#a12d2d;border:1px solid #d8a4a4;padding:8px 14px;}"
+            "QPushButton:hover {background:#fff0f0;}"
+        )
+        actions.addWidget(rename_button)
+        actions.addWidget(delete_button)
+        actions.addStretch(1)
+        close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        close_buttons.rejected.connect(dialog.reject)
+        actions.addWidget(close_buttons)
+        layout.addLayout(actions)
+
+        def refresh_table_list():
+            table.setRowCount(0)
+            project_id = project_combo.currentData()
+            if project_id is None:
+                return
+            for item in self.store.list_tables(project_id):
+                row = table.rowCount()
+                table.insertRow(row)
+                name_item = QTableWidgetItem(item["name"])
+                name_item.setData(Qt.ItemDataRole.UserRole, item["id"])
+                table.setItem(row, 0, name_item)
+                table.setItem(row, 1, QTableWidgetItem(
+                    str(len(self.store.list_records(item["id"])))
+                ))
+                table.setItem(row, 2, QTableWidgetItem(
+                    str(item.get("updated_at") or "—")
+                ))
+            table.resizeColumnsToContents()
+
+        def selected_table_id():
+            row = table.currentRow()
+            item = table.item(row, 0) if row >= 0 else None
+            return item.data(Qt.ItemDataRole.UserRole) if item else None
+
+        def rename_selected():
+            table_id = selected_table_id()
+            if table_id is None:
+                QMessageBox.information(dialog, "Renomear tabela", "Selecione uma tabela.")
+                return
+            current_name = table.item(table.currentRow(), 0).text()
+            new_name, accepted = QInputDialog.getText(
+                dialog, "Renomear tabela", "Novo nome:", text=current_name
             )
-        self.legacy_window.show()
-        self.legacy_window.raise_()
-        self.legacy_window.activateWindow()
+            if not accepted or not new_name.strip() or new_name.strip() == current_name:
+                return
+            try:
+                self.store.update_table(table_id, name=new_name.strip())
+            except Exception as exc:
+                QMessageBox.warning(dialog, "Não foi possível renomear", str(exc))
+                return
+            refresh_table_list()
+            self.refresh_pages()
+
+        def delete_selected():
+            table_id = selected_table_id()
+            if table_id is None:
+                QMessageBox.information(dialog, "Excluir tabela", "Selecione uma tabela.")
+                return
+            current_name = table.item(table.currentRow(), 0).text()
+            count = len(self.store.list_records(table_id))
+            answer = QMessageBox.question(
+                dialog,
+                "Confirmar exclusão",
+                f"Excluir a tabela '{current_name}' e seus {count} registro(s)?\n\n"
+                "Esta ação não pode ser desfeita.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            self.store.delete_table(table_id)
+            refresh_table_list()
+            self.refresh_pages()
+
+        project_combo.currentIndexChanged.connect(refresh_table_list)
+        rename_button.clicked.connect(rename_selected)
+        delete_button.clicked.connect(delete_selected)
+        refresh_table_list()
+        dialog.exec()
 
     def refresh_pages(self):
         current = self.stack.currentIndex()
