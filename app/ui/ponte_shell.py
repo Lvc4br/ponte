@@ -394,7 +394,7 @@ class PonteMainWindow(QMainWindow):
 
         projects = self.store.list_projects()
         datasets = self._workspace_datasets()
-        total_records = sum(item["records"] for item in datasets)
+        total_records = sum(len(item["records"]) for item in datasets)
         total_identified = sum(self._dataset_quality(item)["identifiers"] for item in datasets)
         candidates = sum(
             bool(item["records"]) and any(
