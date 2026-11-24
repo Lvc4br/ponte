@@ -1391,25 +1391,30 @@ class PonteMainWindow(QMainWindow):
         right.setSpacing(12)
         indicators = Panel(
             "Indicadores de engenharia",
-            "Não calculados até aprovação das fórmulas, unidades e regras de comparabilidade pela EGT."
+            "Valores originais importados da OAE selecionada. Não são recalculados nem consolidados."
         )
         metric_grid = QGridLayout()
         metric_grid.setHorizontalSpacing(10)
         metric_grid.setVerticalSpacing(8)
-        for index, (name, unit) in enumerate([
-            ("Paf", "kg/m²"), ("Pap", "kg/m²"), ("Ecm", "unidade a validar"),
-            ("Af", "m²/m²"), ("Aço total indicativo", "kg/m²"),
-            ("Aço total indicativo", "kg/m³"),
-        ]):
+        self.analysis_indicator_cards = []
+        indicator_definitions = [
+            ("Paf", "kg/m²", "Paf_kg_m2", 2),
+            ("Pap", "kg/m²", "Pap_kg_m2", 2),
+            ("Ecm* · em_m3_m2", "m³/m² · associação provisória", "em_m3_m2", 3),
+            ("Af", "m²/m²", "Af_m2_m2", 2),
+            ("Aço total indicativo", "kg/m²", "aço_total_indicativo_kg_m2", 2),
+            ("Aço total indicativo", "kg/m³", "aço_total_indicativo_kg_m3", 2),
+        ]
+        for index, (name, unit, field_name, decimals) in enumerate(indicator_definitions):
             card = QFrame()
-            card.setMinimumHeight(78)
+            card.setMinimumHeight(82)
             card.setStyleSheet("QFrame {background:#f4f7fa;border:1px solid #e1e7ed;border-radius:6px;}")
             box = QVBoxLayout(card)
             box.setContentsMargins(9, 7, 9, 7)
             label = QLabel(name)
             label.setObjectName("mutedSmall")
             label.setWordWrap(True)
-            value = QLabel("Não calculado")
+            value = QLabel("Selecione uma OAE")
             value.setStyleSheet("font-size:12pt;font-weight:700;color:#294b67;")
             unit_label = QLabel(unit)
             unit_label.setObjectName("mutedSmall")
@@ -1417,7 +1422,15 @@ class PonteMainWindow(QMainWindow):
             box.addWidget(value)
             box.addWidget(unit_label)
             metric_grid.addWidget(card, index // 3, index % 3)
+            self.analysis_indicator_cards.append((value, field_name, decimals))
         indicators.body.addLayout(metric_grid)
+        indicator_status = QLabel(
+            "Valor importado — validação técnica pendente. Ecm* é uma associação provisória "
+            "ao campo em_m3_m2 e requer confirmação da EGT."
+        )
+        indicator_status.setObjectName("mutedSmall")
+        indicator_status.setWordWrap(True)
+        indicators.body.addWidget(indicator_status)
         right.addWidget(indicators)
 
         results = Panel(
@@ -1460,6 +1473,7 @@ class PonteMainWindow(QMainWindow):
         self.analysis_project.currentIndexChanged.connect(self._refresh_analysis_tables)
         self.analysis_dataset.currentIndexChanged.connect(self._analysis_dataset_changed)
         self.analysis_search.textChanged.connect(self._apply_analysis_filters)
+        self.analysis_table.itemSelectionChanged.connect(self._analysis_selection_changed)
         self._refresh_analysis_tables()
         scroll.setWidget(content)
         outer.addWidget(scroll)
@@ -1592,6 +1606,7 @@ class PonteMainWindow(QMainWindow):
                 selected.append(record)
 
         headers = [column["name"] for column in self.analysis_columns]
+        self.analysis_filtered_records = selected
         self.analysis_table.setUpdatesEnabled(False)
         self.analysis_table.clear()
         self.analysis_table.setColumnCount(len(headers))
@@ -1615,8 +1630,38 @@ class PonteMainWindow(QMainWindow):
         )
         self.analysis_count.setText(message)
         self.analysis_results_count.setText(message)
+        if len(selected) == 1:
+            self.analysis_table.selectRow(0)
+        else:
+            self._update_analysis_indicators(None)
 
+    def _analysis_selection_changed(self):
+        if not hasattr(self, "analysis_table"):
+            return
+        selected_rows = self.analysis_table.selectionModel().selectedRows()
+        if len(selected_rows) != 1:
+            self._update_analysis_indicators(None)
+            return
+        row = selected_rows[0].row()
+        records = getattr(self, "analysis_filtered_records", [])
+        if row < 0 or row >= len(records):
+            self._update_analysis_indicators(None)
+            return
+        self._update_analysis_indicators(records[row]["values"])
 
+    def _update_analysis_indicators(self, values):
+        if not hasattr(self, "analysis_indicator_cards"):
+            return
+        for value_label, field_name, decimals in self.analysis_indicator_cards:
+            raw_value = self._pick_value(values, field_name) if values is not None else None
+            number = self._analysis_number(raw_value)
+            if raw_value is None or str(raw_value).strip() == "":
+                display = "Dado ausente" if values is not None else "Selecione uma OAE"
+            elif number is None:
+                display = str(raw_value)
+            else:
+                display = f"{number:,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            value_label.setText(display)
 
     def _reports_page(self) -> QWidget:
         """Report catalog layout; generation stays disabled until validated data exists."""
