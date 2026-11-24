@@ -1353,17 +1353,17 @@ class PonteMainWindow(QMainWindow):
             self.analysis_filter_rows.append((field, minimum, maximum))
         filters.body.addLayout(grid)
 
-        self.analysis_search = QLineEdit()
-        self.analysis_search.setPlaceholderText("Pesquisar em todos os campos…")
-        self.analysis_search.setMinimumHeight(38)
-        filters.body.addWidget(self.analysis_search)
-
         filters.body.addWidget(QLabel("Tipo de obra para análise"))
         self.analysis_work_type_filter = QComboBox()
         self.analysis_work_type_filter.addItem("Selecione um tipo para calcular a média", None)
         for work_type in self.store.WORK_TYPES:
             self.analysis_work_type_filter.addItem(work_type, work_type)
         filters.body.addWidget(self.analysis_work_type_filter)
+
+        self.analysis_search = QLineEdit()
+        self.analysis_search.setPlaceholderText("Pesquisar em todos os campos…")
+        self.analysis_search.setMinimumHeight(38)
+        filters.body.addWidget(self.analysis_search)
 
         classification = Panel(
             "Classificar OAE selecionada",
@@ -1518,7 +1518,7 @@ class PonteMainWindow(QMainWindow):
         for field, minimum, maximum in self.analysis_filter_rows:
             field.blockSignals(True)
             field.clear()
-            field.addItem("Selecionar campo", None)
+            field.addItem("Nulo (não aplicar)", None)
         if table_id is None:
             self.analysis_columns = []
             self.analysis_records = []
@@ -1550,14 +1550,12 @@ class PonteMainWindow(QMainWindow):
                 and any(token in column["name"].casefold() for token in unit_tokens)
             )
         ]
-        preferred = ("compr_obra_m", "largura_m", "vão_m", "vao_m", "hviga_laje_m", "em_m3_m2")
-        for row_index, (field, minimum, maximum) in enumerate(self.analysis_filter_rows):
+        for field, minimum, maximum in self.analysis_filter_rows:
             for column in numeric:
                 field.addItem(column["name"], column["name"])
-            if row_index < len(preferred):
-                index = field.findData(preferred[row_index])
-                if index > 0:
-                    field.setCurrentIndex(index)
+            # Each numeric filter starts as null, so it is ignored until the user
+            # explicitly chooses a field and enters at least one limit.
+            field.setCurrentIndex(0)
             field.blockSignals(False)
             minimum.clear()
             maximum.clear()
