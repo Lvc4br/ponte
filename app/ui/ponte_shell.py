@@ -1532,6 +1532,7 @@ class PonteMainWindow(QMainWindow):
             self.analysis_filtered_records = []
             self.analysis_count.setText("Este projeto ainda não possui tabelas importadas.")
             self.analysis_results_count.setText("Nenhum conjunto selecionado.")
+            self.analysis_total_label.setText("Total de obras selecionadas: 0")
             self.analysis_table.clear()
             self.analysis_table.setRowCount(0)
             self.analysis_table.setColumnCount(0)
