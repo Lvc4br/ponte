@@ -40,16 +40,16 @@ jobs:
       - name: Verificar pacote de arquivo unico
         shell: pwsh
         run: |
-          if (!(Test-Path "dist/PONTE.exe")) { throw "PONTE.exe nao foi gerado." }
+          if (!(Test-Path "dist/EGT.exe")) { throw "EGT.exe nao foi gerado." }
           $files = Get-ChildItem "dist" -File -Recurse
-          if ($files.Count -ne 1 -or $files[0].Name -ne "PONTE.exe") {
-            throw "A pasta dist deve conter somente PONTE.exe."
+          if ($files.Count -ne 1 -or $files[0].Name -ne "EGT.exe") {
+            throw "A pasta dist deve conter somente EGT.exe."
           }
-          Get-Item "dist/PONTE.exe" | Select-Object Name, Length
+          Get-Item "dist/EGT.exe" | Select-Object Name, Length
       - name: Publicar executavel
         uses: actions/upload-artifact@v4
         with:
-          name: PONTE-Windows-OneFile
-          path: dist/PONTE.exe
+          name: EGT-Windows-OneFile
+          path: dist/EGT.exe
           if-no-files-found: error
           retention-days: 14
