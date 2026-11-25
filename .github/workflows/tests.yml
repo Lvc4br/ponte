@@ -2,9 +2,9 @@ name: Testes automatizados
 
 on:
   push:
-    branches: [main, "feature/document-control-spreadsheet-review", "feature/three-column-engineering-dashboard"]
+    branches: [main, "feature/document-control-spreadsheet-review", "feature/three-column-engineering-dashboard", "release/desktop-onefile"]
   pull_request:
-    branches: [main, "feature/document-control-spreadsheet-review", "feature/three-column-engineering-dashboard"]
+    branches: [main, "feature/document-control-spreadsheet-review", "feature/three-column-engineering-dashboard", "release/desktop-onefile"]
   workflow_dispatch:
 
 concurrency:
