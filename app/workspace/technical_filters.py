@@ -9,6 +9,8 @@ import math
 import re
 import unicodedata
 
+from app.core.terminology import type_matches
+
 
 ALIASES = {
     "type_obra": ("tipo_obra", "tipo de obra", "tipo obra", "obra tipo"),
@@ -39,7 +41,6 @@ def parse_filter_number(value: object) -> float | None:
     raw = str(value).strip().replace(" ", "")
     if not raw:
         return None
-    # Accept both Brazilian (1.234,56) and international (1,234.56) notation.
     if "," in raw and "." in raw:
         if raw.rfind(",") > raw.rfind("."):
             raw = raw.replace(".", "").replace(",", ".")
@@ -67,7 +68,6 @@ def _within(value, minimum, maximum) -> bool:
     number = parse_filter_number(value)
     if number is not None:
         return (minimum is None or number >= minimum) and (maximum is None or number <= maximum)
-    # Aceita vãos armazenados como intervalo, por exemplo: 41,25 - 41,80.
     if value is None:
         return False
     raw_numbers = re.findall(r'\d+(?:[.,]\d+)?', str(value))
@@ -78,12 +78,13 @@ def _within(value, minimum, maximum) -> bool:
     low, high = min(numbers), max(numbers)
     return (maximum is None or low <= maximum) and (minimum is None or high >= minimum)
 
+
 def matches_technical_filters(values: dict, criteria: dict) -> bool:
     """Return whether one row satisfies the active technical criteria."""
     requested_type = criteria.get("type_obra")
     if requested_type:
         stored_type = _value(values, ALIASES["type_obra"])
-        if stored_type is None or requested_type.casefold() not in str(stored_type).casefold():
+        if stored_type is None or not type_matches(stored_type, requested_type):
             return False
 
     for key, aliases in (("width", ALIASES["width"]), ("length", ALIASES["length"])):
