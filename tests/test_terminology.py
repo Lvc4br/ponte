@@ -37,3 +37,28 @@ def test_terminology_report_preserves_unknown_labels():
         "variants": ["Ponte estaiada", "Ponte atirantada"],
     }]
     assert report["unrecognized"] == ["Estrutura estaiada"]
+
+
+def test_legacy_search_uses_the_alias_vector():
+    from app.core.matching import filter_records
+    from app.core.models import BridgeRecord, SearchCriteria
+
+    rows = [
+        BridgeRecord({"tipo_obra": "Ponte estaiada"}, 1),
+        BridgeRecord({"tipo_obra": "Ponte pênsil"}, 2),
+    ]
+    found = filter_records(rows, SearchCriteria(type_obra="Ponte atirantada"))
+    assert [record.source_row for record in found] == [1]
+
+
+def test_workspace_filter_uses_the_same_alias_vector():
+    from app.workspace.technical_filters import matches_technical_filters
+
+    assert matches_technical_filters(
+        {"Tipo de Obra": "Ponte estaiada"},
+        {"type_obra": "Ponte atirantada"},
+    )
+    assert not matches_technical_filters(
+        {"Tipo de Obra": "Ponte pênsil"},
+        {"type_obra": "Ponte estaiada"},
+    )
