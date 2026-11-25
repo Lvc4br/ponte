@@ -1,5 +1,6 @@
 from app.core.models import BridgeRecord, SearchCriteria
 from app.core.validation import parse_range
+from app.core.terminology import type_matches
 
 FIELDS = {
     "width": "largura_m",
@@ -45,7 +46,7 @@ def match_record(record: BridgeRecord, criteria: SearchCriteria) -> bool:
         stored_type = record.get("tipo_obra")
         if stored_type is None or not str(stored_type).strip():
             return False
-        if str(stored_type).strip().casefold() != criteria.type_obra.strip().casefold():
+        if not type_matches(stored_type, criteria.type_obra):
             return False
 
     for attr, column in FIELDS.items():
