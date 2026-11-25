@@ -1,5 +1,17 @@
 # Changelog
 
+## Atualização de manutenção — nomenclatura técnica
+
+- Adicionado catálogo explícito de equivalências para nomenclaturas de pontes estaiadas.
+- Criada normalização de acentos, caixa, espaços e pontuação para comparação.
+- Unificadas as regras de comparação de tipo na busca da base legada e nos filtros do espaço de dados.
+- Preservado integralmente o valor original importado; a forma canônica é usada apenas para comparação.
+- Incluído relatório de termos reconhecidos e rótulos ainda não mapeados, sem classificação automática de termos ambíguos.
+- Incluídos testes para sinônimos, variações de escrita e prevenção de agrupamentos incorretos.
+- Documentada a arquitetura em `docs/EGT/NOMENCLATURA_TECNICA.md`.
+
+**Atenção:** o código-fonte atualizado ainda precisa passar pela suíte de testes e gerar um novo `EGT.exe`. O executável anteriormente distribuído não recebe esta melhoria automaticamente.
+
 ## EGT — entrega desktop inicial concluída
 
 - Encerrada a implementação da entrega desktop Windows do EGT.
