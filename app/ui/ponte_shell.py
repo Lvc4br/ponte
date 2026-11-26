@@ -1898,7 +1898,7 @@ class PonteMainWindow(QMainWindow):
             QMessageBox.warning(self, "Falha na exportação", str(exc))
             return
         QMessageBox.information(
-            self, "Relatório gerado", f"O arquivo foi criado com sucesso:\\n{destination}"
+            self, "Relatório gerado", f"O arquivo foi criado com sucesso:\n{destination}"
         )
 
     def _documents_page(self) -> QWidget:
