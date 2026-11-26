@@ -1571,6 +1571,16 @@ class PonteMainWindow(QMainWindow):
         self.analysis_search.clear()
         self._apply_analysis_filters()
 
+    def _invalidate_analysis_filter(self, message: str):
+        """Prevent stale rows from being exported while the filter input is invalid."""
+        self.analysis_filtered_records = []
+        self.analysis_table.setRowCount(0)
+        self.analysis_count.setText(message)
+        self.analysis_results_count.setText(message)
+        self.analysis_total_label.setText("OBRAS NO RECORTE: 0")
+        self._update_analysis_indicators([])
+        self._refresh_report_fields()
+
     def _apply_analysis_filters(self, *_):
         if not hasattr(self, "analysis_table"):
             return
@@ -1586,14 +1596,14 @@ class PonteMainWindow(QMainWindow):
             low = self._analysis_number(low_text) if low_text else None
             high = self._analysis_number(high_text) if high_text else None
             if (low_text and low is None) or (high_text and high is None):
-                message = "Use limites numéricos válidos. Exemplo: 12,5."
-                self.analysis_count.setText(message)
-                self.analysis_results_count.setText(message)
+                self._invalidate_analysis_filter(
+                    "Use limites numéricos válidos. Exemplo: 12,5."
+                )
                 return
             if low is not None and high is not None and low > high:
-                message = f"O mínimo de '{name}' não pode ser maior que o máximo."
-                self.analysis_count.setText(message)
-                self.analysis_results_count.setText(message)
+                self._invalidate_analysis_filter(
+                    f"O mínimo de '{name}' não pode ser maior que o máximo."
+                )
                 return
             active_ranges.append((name, low, high))
 
