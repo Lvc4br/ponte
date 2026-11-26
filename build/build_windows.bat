@@ -40,7 +40,7 @@ if exist "%ProgramFiles%\Tesseract-OCR\tesseract.exe" (
     --collect-all pypdf --collect-all pdfplumber --collect-all pyxlsb ^
     --collect-all docx --collect-all pptx --collect-all openpyxl ^
     --collect-all xlrd --collect-all ezdxf --collect-all pypdfium2 ^
-    --collect-all pypdfium2_raw --collect-all pytesseract ^
+    --collect-all pypdfium2_raw --collect-all pytesseract --collect-all matplotlib --collect-all reportlab ^
     --collect-submodules app ^
     --add-data "database\ponte.sql.example;database" ^
     %TESSERACT_ARGS% ^
