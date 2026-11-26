@@ -28,6 +28,7 @@ from app.workspace.analysis import (
     parse_analysis_number,
 )
 from app.workspace.exchange import SpreadsheetExchange
+from app.reports.exporter import export_report
 from app.data.dataset_store import DEFAULT_STORE, DatasetStore
 from app.core.bridge_formatters import bridge_span_text
 from app.core.models import BridgeRecord
@@ -36,6 +37,7 @@ from app.core.models import BridgeRecord
 NAV_ITEMS = [
     ("Importar dados", "⇧"),
     ("Análise de engenharia", "⌕"),
+    ("Relatórios", "▤"),
 ]
 
 
@@ -226,6 +228,7 @@ class PonteMainWindow(QMainWindow):
         # The current product scope exposes only data import and engineering analysis.
         self._add_page("Importar dados", self._import_page())
         self._add_page("Análise de engenharia", self._analysis_page())
+        self._add_page("Relatórios", self._reports_page())
 
     def _add_page(self, name: str, page: QWidget):
         self.pages[name] = page
@@ -1657,6 +1660,7 @@ class PonteMainWindow(QMainWindow):
         # A média usa exatamente o recorte exibido. Sem tipo selecionado, considera todos os tipos;
         # filtros numéricos isolados (inclusive somente máximo) também geram médias.
         self._update_analysis_indicators(selected)
+        self._refresh_report_fields()
         if len(selected) == 1:
             self.analysis_table.selectRow(0)
 
@@ -1727,79 +1731,169 @@ class PonteMainWindow(QMainWindow):
             count_label.setText(count_text)
 
     def _reports_page(self) -> QWidget:
-        """Report catalog layout; generation stays disabled until validated data exists."""
+        """Create editable reports from the exact records shown in engineering analysis."""
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(14)
 
-        heading = QLabel("Transforme análises em entregáveis rastreáveis")
+        heading = QLabel("Relatórios e exportações")
         heading.setStyleSheet("font-size:14pt;font-weight:700;color:#26384b;")
         subtitle = QLabel(
-            "Gere relatórios a partir de conjuntos filtrados, preservando metodologia, versão e evidências."
+            "Gere documentos editáveis e PDF com tabelas e gráficos construídos a partir "
+            "dos registros reais exibidos na Análise de engenharia."
         )
         subtitle.setObjectName("sectionIntro")
+        subtitle.setWordWrap(True)
         layout.addWidget(heading)
         layout.addWidget(subtitle)
 
-        models = Panel(
-            "Modelos de relatório",
-            "A geração será habilitada quando os dados e as fórmulas estiverem validados."
+        scope = Panel(
+            "ESCOPO DO RELATÓRIO",
+            "A exportação utiliza o mesmo projeto, conjunto e filtros ativos na Análise de engenharia."
         )
-        row = QHBoxLayout()
-        for title, detail in [
-            ("Resumo executivo", "Indicadores gerais, escopo e pendências."),
-            ("Comparativo de OAEs", "Amostras compatíveis e critérios aplicados."),
-            ("Relatório de importação", "Origem, mapeamento e validações."),
-            ("Mapa de quantitativos", "Valores por OAE e status de validação."),
-        ]:
-            card = QFrame()
-            card.setStyleSheet(
-                "QFrame {background:#eaf3fa;border:1px solid #d7e6f1;border-radius:7px;}"
-            )
-            box = QVBoxLayout(card)
-            box.setContentsMargins(12, 12, 12, 12)
-            name = QLabel(title)
-            name.setStyleSheet("font-weight:700;color:#294b67;")
-            desc = QLabel(detail)
-            desc.setObjectName("mutedSmall")
-            desc.setWordWrap(True)
-            action = QPushButton("Aguardando integração")
-            action.setEnabled(False)
-            box.addWidget(name)
-            box.addWidget(desc)
-            box.addStretch()
-            box.addWidget(action)
-            row.addWidget(card, 1)
-        models.body.addLayout(row)
-        layout.addWidget(models)
+        self.report_scope_label = QLabel("Nenhum conjunto selecionado.")
+        self.report_scope_label.setObjectName("mutedSmall")
+        self.report_scope_label.setWordWrap(True)
+        scope.body.addWidget(self.report_scope_label)
+        layout.addWidget(scope)
 
-        history = Panel(
-            "Histórico de relatórios",
-            "Filtros, escopo, versão do cálculo e data de geração"
+        chart = Panel("CONFIGURAÇÃO DO GRÁFICO", "Escolha os campos que serão agrupados e comparados.")
+        controls = QGridLayout()
+        controls.addWidget(QLabel("Tipo de gráfico"), 0, 0)
+        self.report_chart_type = QComboBox()
+        for label, key in [
+            ("Barras", "bar"), ("Pizza / rosca", "pie"),
+            ("Linhas", "line"), ("Radar", "radar"),
+        ]:
+            self.report_chart_type.addItem(label, key)
+        controls.addWidget(self.report_chart_type, 1, 0)
+        controls.addWidget(QLabel("Agrupar por"), 0, 1)
+        self.report_category_field = QComboBox()
+        controls.addWidget(self.report_category_field, 1, 1)
+        controls.addWidget(QLabel("Campo numérico"), 0, 2)
+        self.report_value_field = QComboBox()
+        controls.addWidget(self.report_value_field, 1, 2)
+        controls.setColumnStretch(0, 1)
+        controls.setColumnStretch(1, 2)
+        controls.setColumnStretch(2, 2)
+        chart.body.addLayout(controls)
+        layout.addWidget(chart)
+
+        formats = Panel(
+            "GERAR DOCUMENTO",
+            "Os arquivos são salvos no computador. DOCX e PPTX permanecem editáveis."
         )
-        table = QTableWidget(0, 6)
-        table.setHorizontalHeaderLabels(
-            ["Relatório", "Escopo", "Formato", "Gerado em", "Versão", "Status"]
-        )
-        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        table.verticalHeader().setVisible(False)
-        table.horizontalHeader().setStretchLastSection(True)
-        history.body.addWidget(table, 1)
-        empty = QLabel("Nenhum relatório foi gerado neste workspace.")
-        empty.setObjectName("mutedSmall")
-        history.body.addWidget(empty)
-        layout.addWidget(history, 1)
+        buttons = QHBoxLayout()
+        for label, extension in [
+            ("Exportar Excel (.xlsx)", "xlsx"),
+            ("Exportar Word (.docx)", "docx"),
+            ("Exportar PowerPoint (.pptx)", "pptx"),
+            ("Exportar PDF", "pdf"),
+        ]:
+            button = QPushButton(label)
+            button.setObjectName("primaryAction" if extension == "pdf" else "secondaryAction")
+            button.setMinimumHeight(42)
+            button.clicked.connect(lambda checked=False, fmt=extension: self._export_report(fmt))
+            buttons.addWidget(button, 1)
+        formats.body.addLayout(buttons)
+        layout.addWidget(formats)
 
         note = QLabel(
-            "Todo relatório deverá exibir filtros, tamanho e critérios da amostra, exclusões, "
-            "unidades, origem, fórmulas e versão metodológica. Estimativas não serão apresentadas "
-            "como quantitativos executivos."
+            "Os gráficos são descritivos: pizza, barras, linhas e radar. O PONTE não transforma "
+            "automaticamente esses resultados em avaliação de segurança, diagnóstico estrutural "
+            "ou conclusão de engenharia."
         )
         note.setWordWrap(True)
         note.setStyleSheet("background:#fff5e5;color:#93621f;padding:11px;border-radius:6px;")
         layout.addWidget(note)
+        layout.addStretch(1)
+        self._refresh_report_fields()
         return page
+
+    def _refresh_report_fields(self):
+        if not hasattr(self, "report_category_field"):
+            return
+        columns = getattr(self, "analysis_columns", [])
+        records = getattr(self, "analysis_records", [])
+        self.report_category_field.clear()
+        self.report_category_field.addItem("Índice do registro", "")
+        for column in columns:
+            self.report_category_field.addItem(column["name"], column["name"])
+
+        numeric = []
+        for column in columns:
+            name = column["name"]
+            if column.get("data_type") in ("integer", "decimal") or any(
+                self._analysis_number(record.get("values", {}).get(name)) is not None
+                for record in records
+            ):
+                numeric.append(name)
+        self.report_value_field.clear()
+        for name in numeric:
+            self.report_value_field.addItem(name, name)
+        if not numeric:
+            self.report_value_field.addItem("Nenhum campo numérico disponível", "")
+        if hasattr(self, "report_scope_label"):
+            project = self.analysis_project.currentText() if hasattr(self, "analysis_project") else ""
+            dataset = self.analysis_dataset.currentText() if hasattr(self, "analysis_dataset") else ""
+            count = len(getattr(self, "analysis_filtered_records", []))
+            self.report_scope_label.setText(
+                f"Projeto: {project or '—'} · Conjunto: {dataset or '—'} · "
+                f"Registros no recorte: {count}"
+            )
+
+    def _export_report(self, extension: str):
+        records = list(getattr(self, "analysis_filtered_records", []))
+        columns = list(getattr(self, "analysis_columns", []))
+        if not records:
+            QMessageBox.information(
+                self, "Relatórios", "Não há registros no recorte. Selecione um conjunto na Análise de engenharia."
+            )
+            return
+        if not self.report_value_field.currentData():
+            QMessageBox.information(
+                self, "Relatórios", "O conjunto precisa ter pelo menos um campo numérico válido para gerar o gráfico."
+            )
+            return
+
+        project_name = self.analysis_project.currentText()
+        table_name = self.analysis_dataset.currentText().split(" · ", 1)[0]
+        suggested = f"Relatorio_{table_name}".replace(" ", "_")
+        filters_note = self.analysis_count.text()
+        chart_type = self.report_chart_type.currentData()
+        category_field = self.report_category_field.currentData()
+        value_field = self.report_value_field.currentData()
+        file_filter = {
+            "xlsx": "Pasta de trabalho do Excel (*.xlsx)",
+            "docx": "Documento do Word (*.docx)",
+            "pptx": "Apresentação do PowerPoint (*.pptx)",
+            "pdf": "Documento PDF (*.pdf)",
+        }[extension]
+        destination, _ = QFileDialog.getSaveFileName(
+            self, "Salvar relatório", f"{suggested}.{extension}", file_filter
+        )
+        if not destination:
+            return
+        if not destination.lower().endswith(f".{extension}"):
+            destination += f".{extension}"
+        try:
+            export_report(
+                records, columns, destination,
+                title=f"Relatório · {table_name}",
+                project_name=project_name,
+                table_name=table_name,
+                chart_type=chart_type,
+                category_field=category_field,
+                value_field=value_field,
+                filters_note=filters_note,
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "Falha na exportação", str(exc))
+            return
+        QMessageBox.information(
+            self, "Relatório gerado", f"O arquivo foi criado com sucesso:\\n{destination}"
+        )
 
     def _documents_page(self) -> QWidget:
         """Local document catalog with search, status filtering and source inspection."""
