@@ -5,6 +5,9 @@ from app.core.bridge_types import (
     identify_classifications,
     normalize_classification_text,
 )
+from app.core.matching import filter_records
+from app.core.models import BridgeRecord, SearchCriteria
+from app.workspace.technical_filters import matches_technical_filters
 
 
 @pytest.mark.parametrize(
@@ -66,3 +69,19 @@ def test_identifies_multiple_independent_dimensions_in_one_cell():
     assert ("structural_system", "Estaiada") in found
     assert ("section_configuration", "Seção celular") in found
     assert ("construction_method", "Consolos sucessivos") in found
+
+
+def test_core_record_filter_uses_engineering_aliases():
+    rows = [
+        BridgeRecord({"tipo_obra": "Ponte atirantada"}, 1),
+        BridgeRecord({"tipo_obra": "Viga biapoiada"}, 2),
+    ]
+    result = filter_records(rows, SearchCriteria(type_obra="Estaiada"))
+    assert [record.source_row for record in result] == [1]
+
+
+def test_workspace_filter_uses_engineering_aliases():
+    assert matches_technical_filters(
+        {"Tipo de obra": "Ponte construída por balanços sucessivos"},
+        {"type_obra": "Consolos sucessivos"},
+    )
