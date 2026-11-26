@@ -43,6 +43,18 @@ def _chart_image(records, chart_type, category_field, value_field, destination):
         raise ValueError(f"O campo '{value_field}' não contém valores numéricos válidos.")
     labels = list(grouped)
     values = [grouped[label] for label in labels]
+
+    # Never turn a long list of individual OAEs into an unreadable pie chart.
+    if chart_type == "pie" and len(labels) > 8:
+        ranked = sorted(zip(labels, values), key=lambda item: abs(item[1]), reverse=True)
+        kept, rest = ranked[:7], ranked[7:]
+        labels = [item[0] for item in kept] + ["Outros"]
+        values = [item[1] for item in kept] + [sum(item[1] for item in rest)]
+    elif len(labels) > 15:
+        ranked = sorted(zip(labels, values), key=lambda item: abs(item[1]), reverse=True)[:15]
+        labels = [item[0] for item in ranked]
+        values = [item[1] for item in ranked]
+
     if chart_type == "pie" and (any(value < 0 for value in values) or sum(values) <= 0):
         raise ValueError("O gráfico de pizza exige valores não negativos e soma maior que zero.")
 
@@ -242,48 +254,94 @@ def _export_pptx(target, title, headers, rows, metadata, chart_path):
 
 
 def _export_pdf(target, title, headers, rows, metadata, chart_path):
+    from html import escape
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_LEFT
     from reportlab.lib.units import mm
     from reportlab.platypus import (
         Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
     )
 
+    page_width, _ = landscape(A4)
+    margin = 12 * mm
+    available_width = page_width - 2 * margin
+    styles = getSampleStyleSheet()
+    cell_style = ParagraphStyle(
+        "ReportCell", parent=styles["BodyText"], fontName="Helvetica",
+        fontSize=7, leading=8.5, alignment=TA_LEFT, wordWrap="CJK",
+        spaceAfter=0, spaceBefore=0,
+    )
+    header_style = ParagraphStyle(
+        "ReportHeader", parent=cell_style, fontName="Helvetica-Bold",
+        textColor=colors.white, fontSize=7, leading=8,
+    )
     document = SimpleDocTemplate(
         str(target), pagesize=landscape(A4),
-        rightMargin=12 * mm, leftMargin=12 * mm,
+        rightMargin=margin, leftMargin=margin,
         topMargin=12 * mm, bottomMargin=12 * mm,
+        title=title, author="PONTE",
     )
-    styles = getSampleStyleSheet()
-    story = [Paragraph(title, styles["Title"]), Spacer(1, 5 * mm)]
-    story.append(Paragraph("PONTE · Relatório gerado a partir do recorte selecionado", styles["Normal"]))
-    story.append(Spacer(1, 3 * mm))
-    meta = Table([["Campo", "Informação"]] + [list(item) for item in metadata], colWidths=[42 * mm, 210 * mm])
+    story = [
+        Paragraph(escape(title), styles["Title"]),
+        Spacer(1, 3 * mm),
+        Paragraph("PONTE · Relatório gerado a partir do recorte selecionado", styles["Normal"]),
+        Spacer(1, 3 * mm),
+    ]
+    meta_rows = [[Paragraph("<b>Campo</b>", cell_style), Paragraph("<b>Informação</b>", cell_style)]]
+    meta_rows += [[Paragraph(escape(str(k)), cell_style), Paragraph(escape(str(v)), cell_style)] for k, v in metadata]
+    meta = Table(meta_rows, colWidths=[38 * mm, available_width - 38 * mm], repeatRows=1)
     meta.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#173F5F")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5DF")),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
         ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
     ]))
     story.extend([meta, Spacer(1, 5 * mm), Paragraph("Visualização gráfica", styles["Heading2"])])
-    story.append(Image(str(chart_path), width=245 * mm, height=130 * mm))
-    story.extend([Spacer(1, 4 * mm), Paragraph("Dados exportados", styles["Heading2"])])
-    safe_headers = [Paragraph(str(header), styles["BodyText"]) for header in headers]
-    safe_rows = [[Paragraph("" if value is None else str(value), styles["BodyText"]) for value in row] for row in rows]
-    available_width = landscape(A4)[0] - 24 * mm
-    column_width = available_width / max(1, len(headers))
-    data = Table([safe_headers] + safe_rows, colWidths=[column_width] * len(headers), repeatRows=1)
-    data.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#287DB5")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D7E0E8")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("FONTSIZE", (0, 0), (-1, -1), 7),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-    ]))
-    story.append(data)
+    story.append(Image(str(chart_path), width=220 * mm, height=112 * mm))
+    story.extend([Spacer(1, 4 * mm), Paragraph("Dados do recorte", styles["Heading2"])])
+    story.append(Paragraph(
+        f"{len(rows)} registros · {len(headers)} campos. A tabela foi dividida em grupos de colunas "
+        "para preservar a leitura em páginas A4 paisagem.",
+        styles["Normal"],
+    ))
+
+    # Split wide datasets into readable column groups instead of squeezing every
+    # field into a tiny fraction of the page width.
+    group_size = 6
+    for group_start in range(0, len(headers), group_size):
+        group_headers = headers[group_start:group_start + group_size]
+        group_rows = [row[group_start:group_start + group_size] for row in rows]
+        if group_start:
+            story.append(PageBreak())
+        story.append(Paragraph(
+            f"Campos {group_start + 1}–{min(group_start + group_size, len(headers))} de {len(headers)}",
+            styles["Heading3"],
+        ))
+        weights = [min(max(len(str(header)), 10), 28) for header in group_headers]
+        weight_total = sum(weights) or 1
+        widths = [available_width * weight / weight_total for weight in weights]
+        table_data = [[Paragraph(escape(str(header)), header_style) for header in group_headers]]
+        for row in group_rows:
+            table_data.append([
+                Paragraph(escape("" if value is None else str(value)), cell_style)
+                for value in row
+            ])
+        data_table = Table(table_data, colWidths=widths, repeatRows=1, hAlign="LEFT")
+        data_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#287DB5")),
+            ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#D7E0E8")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F3F7FA")]),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(data_table)
     document.build(story)
