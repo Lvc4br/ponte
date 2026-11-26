@@ -18,7 +18,7 @@ from app.workspace.formulas import FormulaEngine, FormulaError
 
 
 class WorkspaceStore:
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
 
     def __init__(self, path: str | Path = DEFAULT_STORE):
         self.path = Path(path)
@@ -78,6 +78,11 @@ class WorkspaceStore:
                 );
                 CREATE INDEX IF NOT EXISTS idx_workspace_records_table
                     ON workspace_records(table_id, id);
+                CREATE TABLE IF NOT EXISTS workspace_record_classifications (
+                    record_id INTEGER PRIMARY KEY REFERENCES workspace_records(id) ON DELETE CASCADE,
+                    work_type TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
                 CREATE TABLE IF NOT EXISTS workspace_relations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     project_id INTEGER NOT NULL REFERENCES workspace_projects(id) ON DELETE CASCADE,
@@ -106,12 +111,13 @@ class WorkspaceStore:
                 )
             elif row["version"] > self.SCHEMA_VERSION:
                 raise RuntimeError("O banco foi criado por uma versão mais recente do PONTE.")
-            elif row["version"] < 2:
-                column_names = {
-                    item["name"] for item in db.execute("PRAGMA table_info(workspace_columns)")
-                }
-                if "formula" not in column_names:
-                    db.execute("ALTER TABLE workspace_columns ADD COLUMN formula TEXT")
+            elif row["version"] < self.SCHEMA_VERSION:
+                if row["version"] < 2:
+                    column_names = {
+                        item["name"] for item in db.execute("PRAGMA table_info(workspace_columns)")
+                    }
+                    if "formula" not in column_names:
+                        db.execute("ALTER TABLE workspace_columns ADD COLUMN formula TEXT")
                 db.execute(
                     "UPDATE ponte_schema_version SET version=? WHERE component='workspace'",
                     (self.SCHEMA_VERSION,),
@@ -235,6 +241,32 @@ class WorkspaceStore:
         with self._connect() as db:
             cursor = db.execute("DELETE FROM workspace_tables WHERE id=?", (int(table_id),))
             return cursor.rowcount == 1
+
+    def replace_tables(self, replacements) -> None:
+        """Atomically replace existing tables with fully imported staging tables.
+
+        Each item is (existing_table_id, staged_table_id, final_name). The old
+        table is removed only after every replacement has been imported.
+        """
+        with self._connect() as db:
+            for existing_id, staged_id, final_name in replacements:
+                existing = db.execute(
+                    "SELECT project_id FROM workspace_tables WHERE id=?",
+                    (int(existing_id),),
+                ).fetchone()
+                staged = db.execute(
+                    "SELECT project_id FROM workspace_tables WHERE id=?",
+                    (int(staged_id),),
+                ).fetchone()
+                if existing is None or staged is None:
+                    raise KeyError("Uma das tabelas da substituição não existe mais.")
+                if existing["project_id"] != staged["project_id"]:
+                    raise ValueError("As tabelas da substituição devem pertencer ao mesmo projeto.")
+                db.execute("DELETE FROM workspace_tables WHERE id=?", (int(existing_id),))
+                db.execute(
+                    "UPDATE workspace_tables SET name=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (self._name(final_name, "Nome da tabela"), int(staged_id)),
+                )
 
     def add_column(self, table_id: int, name: str, data_type="text", *,
                    required=False, default=None, position=None, formula=None) -> int:
@@ -418,6 +450,51 @@ class WorkspaceStore:
                 (self._json(normalized), int(record_id)),
             )
             return True
+
+    WORK_TYPES = (
+        "Viga biapoiada",
+        "Viga contínua",
+        "Laje",
+        "Seção celular",
+        "Estaiada",
+        "Consolos sucessivos",
+    )
+
+    def set_record_work_type(self, record_id: int, work_type: str | None) -> bool:
+        """Persist an optional engineering classification without changing source values."""
+        if work_type is not None and work_type not in self.WORK_TYPES:
+            raise ValueError("Tipo de obra não reconhecido.")
+        with self._connect() as db:
+            exists = db.execute(
+                "SELECT 1 FROM workspace_records WHERE id=?", (int(record_id),)
+            ).fetchone()
+            if exists is None:
+                return False
+            if work_type is None:
+                db.execute(
+                    "DELETE FROM workspace_record_classifications WHERE record_id=?",
+                    (int(record_id),),
+                )
+            else:
+                db.execute(
+                    """INSERT INTO workspace_record_classifications(record_id, work_type)
+                       VALUES (?, ?)
+                       ON CONFLICT(record_id) DO UPDATE SET
+                       work_type=excluded.work_type, updated_at=CURRENT_TIMESTAMP""",
+                    (int(record_id), work_type),
+                )
+            return True
+
+    def list_record_work_types(self, table_id: int) -> dict[int, str]:
+        with self._connect() as db:
+            rows = db.execute(
+                """SELECT c.record_id, c.work_type
+                   FROM workspace_record_classifications c
+                   JOIN workspace_records r ON r.id=c.record_id
+                   WHERE r.table_id=?""",
+                (int(table_id),),
+            ).fetchall()
+        return {int(row["record_id"]): row["work_type"] for row in rows}
 
     def delete_record(self, record_id: int) -> bool:
         with self._connect() as db:

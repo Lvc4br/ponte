@@ -159,7 +159,7 @@ class SpreadsheetExchange:
             f"Importado de {path.name}",
         )
 
-    def import_xlsx(self, project_id: int, path: str | Path, *, sheet_name=None):
+    def import_xlsx(self, project_id: int, path: str | Path, *, sheet_name=None, table_names=None):
         from openpyxl import load_workbook
 
         path = Path(path)
@@ -178,7 +178,8 @@ class SpreadsheetExchange:
                         continue
                     header_index = self._detect_header_row(rows)
                     created.append(self._create_from_rows(
-                        project_id, sheet.title, rows[header_index], rows[header_index + 1:],
+                        project_id, (table_names or {}).get(sheet.title, sheet.title),
+                        rows[header_index], rows[header_index + 1:],
                         f"Importado de {path.name}, aba {sheet.title}",
                     ))
                 return created
@@ -189,7 +190,7 @@ class SpreadsheetExchange:
         finally:
             workbook.close()
 
-    def import_xls(self, project_id: int, path: str | Path, *, sheet_name=None):
+    def import_xls(self, project_id: int, path: str | Path, *, sheet_name=None, table_names=None):
         import xlrd
 
         path = Path(path)
@@ -219,7 +220,8 @@ class SpreadsheetExchange:
                     if rows:
                         header_index = self._detect_header_row(rows)
                         created.append(self._create_from_rows(
-                            project_id, name, rows[header_index], rows[header_index + 1:],
+                            project_id, (table_names or {}).get(name, name),
+                            rows[header_index], rows[header_index + 1:],
                             f"Importado de {path.name}, aba {name}",
                         ))
                 return created
@@ -230,7 +232,7 @@ class SpreadsheetExchange:
         finally:
             workbook.release_resources()
 
-    def import_xlsb(self, project_id: int, path: str | Path, *, sheet_name=None):
+    def import_xlsb(self, project_id: int, path: str | Path, *, sheet_name=None, table_names=None):
         from pyxlsb import open_workbook
 
         path = Path(path)
@@ -246,7 +248,8 @@ class SpreadsheetExchange:
                     if rows:
                         header_index = self._detect_header_row(rows)
                         created.append(self._create_from_rows(
-                            project_id, name, rows[header_index], rows[header_index + 1:],
+                            project_id, (table_names or {}).get(name, name),
+                            rows[header_index], rows[header_index + 1:],
                             f"Importado de {path.name}, aba {name}",
                         ))
                 return created

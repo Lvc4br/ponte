@@ -9,6 +9,8 @@ import math
 import re
 import unicodedata
 
+from app.core.bridge_types import classification_matches
+
 
 ALIASES = {
     "type_obra": ("tipo_obra", "tipo de obra", "tipo obra", "obra tipo"),
@@ -78,12 +80,13 @@ def _within(value, minimum, maximum) -> bool:
     low, high = min(numbers), max(numbers)
     return (maximum is None or low <= maximum) and (minimum is None or high >= minimum)
 
+
 def matches_technical_filters(values: dict, criteria: dict) -> bool:
     """Return whether one row satisfies the active technical criteria."""
     requested_type = criteria.get("type_obra")
     if requested_type:
         stored_type = _value(values, ALIASES["type_obra"])
-        if stored_type is None or requested_type.casefold() not in str(stored_type).casefold():
+        if stored_type is None or not classification_matches(stored_type, requested_type):
             return False
 
     for key, aliases in (("width", ALIASES["width"]), ("length", ALIASES["length"])):
