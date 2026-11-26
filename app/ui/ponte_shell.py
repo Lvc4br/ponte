@@ -1814,12 +1814,16 @@ class PonteMainWindow(QMainWindow):
     def _refresh_report_fields(self):
         if not hasattr(self, "report_category_field"):
             return
+        previous_category = self.report_category_field.currentData()
+        previous_value = self.report_value_field.currentData()
         columns = getattr(self, "analysis_columns", [])
         records = getattr(self, "analysis_records", [])
         self.report_category_field.clear()
         self.report_category_field.addItem("Índice do registro", "")
         for column in columns:
             self.report_category_field.addItem(column["name"], column["name"])
+        category_index = self.report_category_field.findData(previous_category)
+        self.report_category_field.setCurrentIndex(max(0, category_index))
 
         numeric = []
         for column in columns:
@@ -1834,6 +1838,8 @@ class PonteMainWindow(QMainWindow):
             self.report_value_field.addItem(name, name)
         if not numeric:
             self.report_value_field.addItem("Nenhum campo numérico disponível", "")
+        value_index = self.report_value_field.findData(previous_value)
+        self.report_value_field.setCurrentIndex(max(0, value_index))
         if hasattr(self, "report_scope_label"):
             project = self.analysis_project.currentText() if hasattr(self, "analysis_project") else ""
             dataset = self.analysis_dataset.currentText() if hasattr(self, "analysis_dataset") else ""
