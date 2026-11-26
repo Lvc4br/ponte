@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime
+import math
 from pathlib import Path
 from typing import Iterable
 
@@ -33,7 +34,7 @@ def _chart_image(records, chart_type, category_field, value_field, destination):
             number = float(raw)
         except (TypeError, ValueError):
             continue
-        if not __import__("math").isfinite(number):
+        if not math.isfinite(number):
             continue
         category = str(values.get(category_field) or f"Registro {index}") if category_field else f"Registro {index}"
         grouped[category] += number
@@ -54,7 +55,7 @@ def _chart_image(records, chart_type, category_field, value_field, destination):
     FigureCanvasAgg(figure)
     if chart_type == "pie":
         axes = figure.add_subplot(111)
-        axes.pie(values, labels=labels, autopct="%1.1f%%", startangle=90)
+        axes.pie(values, labels=labels, autopct="%1.1f%%", startangle=90, wedgeprops={"width": 0.45})
         axes.axis("equal")
     elif chart_type == "bar":
         axes = figure.add_subplot(111)
@@ -272,7 +273,9 @@ def _export_pdf(target, title, headers, rows, metadata, chart_path):
     story.extend([Spacer(1, 4 * mm), Paragraph("Dados exportados", styles["Heading2"])])
     safe_headers = [Paragraph(str(header), styles["BodyText"]) for header in headers]
     safe_rows = [[Paragraph("" if value is None else str(value), styles["BodyText"]) for value in row] for row in rows]
-    data = Table([safe_headers] + safe_rows, repeatRows=1)
+    available_width = landscape(A4)[0] - 24 * mm
+    column_width = available_width / max(1, len(headers))
+    data = Table([safe_headers] + safe_rows, colWidths=[column_width] * len(headers), repeatRows=1)
     data.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#287DB5")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
