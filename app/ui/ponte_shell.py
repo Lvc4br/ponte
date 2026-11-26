@@ -1372,21 +1372,6 @@ class PonteMainWindow(QMainWindow):
         self.analysis_search.setMinimumHeight(38)
         filters.body.addWidget(self.analysis_search)
 
-        classification = Panel(
-            "Classificar OAE selecionada",
-            "A classificação é opcional, individual e pode ser alterada depois."
-        )
-        self.analysis_classification = QComboBox()
-        self.analysis_classification.addItem("Sem classificação", None)
-        for work_type in self.store.WORK_TYPES:
-            self.analysis_classification.addItem(work_type, work_type)
-        classification.body.addWidget(self.analysis_classification)
-        save_classification = QPushButton("Salvar tipo na OAE selecionada")
-        save_classification.setObjectName("secondaryAction")
-        save_classification.clicked.connect(self._save_selected_work_type)
-        classification.body.addWidget(save_classification)
-        filters.body.addWidget(classification)
-
         buttons = QHBoxLayout()
         buttons.setSpacing(8)
         apply_button = QPushButton("Aplicar filtros")
@@ -1507,7 +1492,6 @@ class PonteMainWindow(QMainWindow):
         self.analysis_dataset.currentIndexChanged.connect(self._analysis_dataset_changed)
         self.analysis_work_type_filter.currentIndexChanged.connect(self._apply_analysis_filters)
         self.analysis_search.textChanged.connect(self._apply_analysis_filters)
-        self.analysis_table.itemSelectionChanged.connect(self._analysis_selection_changed)
         self._refresh_analysis_tables()
         scroll.setWidget(content)
         outer.addWidget(scroll)
@@ -1544,7 +1528,6 @@ class PonteMainWindow(QMainWindow):
             self.analysis_table.clear()
             self.analysis_table.setRowCount(0)
             self.analysis_table.setColumnCount(0)
-            self.analysis_classification.setCurrentIndex(0)
             self._update_analysis_indicators([])
             for field, minimum, maximum in self.analysis_filter_rows:
                 field.blockSignals(False)
@@ -1555,7 +1538,6 @@ class PonteMainWindow(QMainWindow):
         self.analysis_columns = self.store.list_columns(table_id)
         self.analysis_records = self.store.list_records(table_id)
         self.analysis_work_types = self.store.list_record_work_types(table_id)
-        self.analysis_classification.setCurrentIndex(0)
         unit_tokens = ("_m", "m²", "m2", "m³", "m3", "_kg", "kg_", "mm", "cm")
         excluded = {"obra", "data", "id", "identificador", "seção", "secao"}
         numeric = [
@@ -1663,46 +1645,6 @@ class PonteMainWindow(QMainWindow):
         self._refresh_report_fields()
         if len(selected) == 1:
             self.analysis_table.selectRow(0)
-
-    def _analysis_selection_changed(self):
-        if not hasattr(self, "analysis_table"):
-            return
-        selected_rows = self.analysis_table.selectionModel().selectedRows()
-        if len(selected_rows) != 1:
-            self.analysis_classification.setCurrentIndex(0)
-            return
-        row = selected_rows[0].row()
-        records = getattr(self, "analysis_filtered_records", [])
-        if row < 0 or row >= len(records):
-            self.analysis_classification.setCurrentIndex(0)
-            return
-        record_id = records[row]["id"]
-        work_type = self.analysis_work_types.get(record_id)
-        index = self.analysis_classification.findData(work_type)
-        self.analysis_classification.setCurrentIndex(max(0, index))
-
-    def _save_selected_work_type(self):
-        if not hasattr(self, "analysis_table") or self.analysis_dataset.currentData() is None:
-            QMessageBox.information(self, "Classificar OAE", "Selecione um conjunto de dados.")
-            return
-        selected_rows = self.analysis_table.selectionModel().selectedRows()
-        if len(selected_rows) != 1:
-            QMessageBox.information(self, "Classificar OAE", "Selecione uma OAE na tabela.")
-            return
-        row = selected_rows[0].row()
-        if row < 0 or row >= len(self.analysis_filtered_records):
-            return
-        record_id = self.analysis_filtered_records[row]["id"]
-        work_type = self.analysis_classification.currentData()
-        try:
-            self.store.set_record_work_type(record_id, work_type)
-        except Exception as exc:
-            QMessageBox.warning(self, "Não foi possível salvar", str(exc))
-            return
-        self.analysis_work_types = self.store.list_record_work_types(
-            self.analysis_dataset.currentData()
-        )
-        self._apply_analysis_filters()
 
     def _update_analysis_indicators(self, records):
         if not hasattr(self, "analysis_indicator_cards"):
