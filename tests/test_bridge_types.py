@@ -37,6 +37,7 @@ def test_normalization_ignores_accents_case_and_punctuation():
         ("Viga-caixão de concreto", "caixão"),
         ("Ponte atirantada", "Estaiada"),
         ("Ponte rodoviária", "ponte"),
+        ("Ponte em arco", "Ponte"),
         ("Viga simplesmente apoiada", "Viga biapoiada"),
     ],
 )
@@ -49,7 +50,6 @@ def test_classification_match_accepts_known_aliases(actual, requested):
     [
         ("Viga biapoiada", "Viga contínua"),
         ("Ponte estaiada", "Ponte pênsil"),
-        ("Ponte em arco", "Ponte"),
         ("Viga biapoiada", "biapoiadismo"),
         ("Seção celular", "Seção caixão"),
     ],
