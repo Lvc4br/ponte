@@ -9,6 +9,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from app.version import APP_VERSION
+
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
@@ -160,6 +162,9 @@ class PonteMainWindow(QMainWindow):
         side_status.setObjectName("workspaceNote")
         side_status.setWordWrap(True)
         side.addWidget(side_status)
+        version_label = QLabel(f"EGT | Versão {APP_VERSION}")
+        version_label.setObjectName("workspaceNote")
+        side.addWidget(version_label)
 
         content = QWidget()
         content.setObjectName("content")
@@ -1640,11 +1645,20 @@ class PonteMainWindow(QMainWindow):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
             self.analysis_table.setColumnWidth(col, 145)
         self.analysis_table.setUpdatesEnabled(True)
+        range_details = []
+        for name, low, high in active_ranges:
+            limits = []
+            if low is not None:
+                limits.append(f"mín. {low:g}")
+            if high is not None:
+                limits.append(f"máx. {high:g}")
+            range_details.append(f"{name}: {', '.join(limits)}")
+
         message = (
             f"{len(selected)} de {len(records)} registros exibidos"
             + (f" · tipo: {selected_type}" if selected_type else " · todos os tipos")
-            + (f" · {len(active_ranges)} intervalo(s) ativo(s)" if active_ranges else "")
-            + (" · pesquisa textual ativa" if needle else "")
+            + (f" · filtros: {'; '.join(range_details)}" if range_details else "")
+            + (f" · pesquisa: '{needle}'" if needle else "")
         )
         self.analysis_count.setText(message)
         self.analysis_total_label.setText(f"OBRAS NO RECORTE: {len(selected)}")
@@ -1835,6 +1849,20 @@ class PonteMainWindow(QMainWindow):
             return
         if not destination.lower().endswith(f".{extension}"):
             destination += f".{extension}"
+
+        answer = QMessageBox.question(
+            self,
+            "Confirmar exportação",
+            f"Serão exportados {len(records)} registro(s).\n\n"
+            f"Projeto: {project_name}\nConjunto: {table_name}\n"
+            f"Formato: {extension.upper()}\n\n"
+            f"Recorte aplicado:\n{filters_note}\n\n"
+            "Deseja continuar?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
         try:
             export_report(
                 records, columns, destination,
@@ -1850,7 +1878,12 @@ class PonteMainWindow(QMainWindow):
             QMessageBox.warning(self, "Falha na exportação", str(exc))
             return
         QMessageBox.information(
-            self, "Relatório gerado", f"O arquivo foi criado com sucesso:\n{destination}"
+            self,
+            "Relatório gerado",
+            f"Exportação concluída com sucesso!\n\n"
+            f"Registros exportados: {len(records)}\n"
+            f"Formato: {extension.upper()}\n\n"
+            f"Arquivo: {destination}",
         )
 
     def _documents_page(self) -> QWidget:
