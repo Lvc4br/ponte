@@ -10,6 +10,7 @@ on:
     branches:
       - main
       - "rebuild/**"
+      - ui/ponte-design-system-shell
   workflow_dispatch:
 
 concurrency:
@@ -54,13 +55,13 @@ jobs:
       - name: Verificar arquivos do pacote
         shell: pwsh
         run: |
-          if (!(Test-Path "dist/PONTE/PONTE.exe")) { throw "PONTE.exe não foi gerado." }
-          if (!(Test-Path "dist/PONTE/database/ponte.sql.example")) { throw "SQL de exemplo ausente." }
-          Get-ChildItem "dist/PONTE" -Force | Select-Object Name, Length
+          if (!(Test-Path "dist/EGT.exe")) { throw "EGT.exe não foi gerado." }
+          if (!(Test-Path "database/ponte.sql.example")) { throw "SQL de exemplo ausente no código-fonte." }
+          Get-Item "dist/EGT.exe" | Select-Object Name, Length
       - name: Publicar pacote como artefato
         uses: actions/upload-artifact@v4
         with:
-          name: PONTE-Windows-Python313
-          path: dist/PONTE/
+          name: EGT-Windows-Python313
+          path: dist/EGT.exe
           if-no-files-found: error
           retention-days: 14
